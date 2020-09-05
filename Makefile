@@ -1,11 +1,14 @@
-sl_avr_emu : sl_avr_emu.o sl_avr_emu_tick.o
-	cc -o sl_avr_emu sl_avr_emu.o sl_avr_emu_tick.o
+sl_avr_emu : sl_avr_emu.o sl_avr_emu_tick.o sl_avr_emu_hex.o
+	cc -o sl_avr_emu sl_avr_emu.o sl_avr_emu_tick.o sl_avr_emu_hex.o
 
-sl_avr_emu.o : src/sl_avr_emu.cpp inc/sl_avr_emu.hpp inc/sl_avr_emu_tick.hpp inc/sl_avr_emu_types.hpp
-	cc sl_avr_emu.o -c -Iinc/ src/sl_avr_emu.cpp
+sl_avr_emu.o : src/sl_avr_emu.c inc/sl_avr_emu.h inc/sl_avr_emu_tick.h inc/sl_avr_emu_types.h
+	cc sl_avr_emu.o -c -Iinc/ src/sl_avr_emu.c
 
-sl_avr_emu_tick.o : src/sl_avr_emu_tick.cpp inc/sl_avr_emu.hpp inc/sl_avr_emu_tick.hpp inc/sl_avr_emu_types.hpp inc/sl_avr_emu_bitops.hpp
-	cc sl_avr_emu.o -c -Iinc/ src/sl_avr_emu_tick.cpp
+sl_avr_emu_tick.o : src/sl_avr_emu_tick.c inc/sl_avr_emu.h inc/sl_avr_emu_tick.h inc/sl_avr_emu_types.h inc/sl_avr_emu_bitops.h
+	cc sl_avr_emu.o -c -Iinc/ src/sl_avr_emu_tick.c
+
+sl_avr_emu_hex.o : src/sl_avr_emu_hex.c inc/sl_avr_emu.h inc/sl_avr_emu_hex.h inc/sl_avr_emu_types.h
+	cc sl_avr_emu.o -c -Iinc/ src/sl_avr_emu_hex.c
 
 clean :
 	rm *.o sl_avr_emu

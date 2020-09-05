@@ -1,5 +1,5 @@
 /**
- * @file sl_avr_emu_tick.hpp
+ * @file sl_avr_emu_tick.h
  * @author Ed Sandor (ed@ewsandor.com)
  * @brief Sandor Labs AVR Emulator Tick Logic Header
  * @version 0.1
@@ -12,7 +12,7 @@
 #ifndef _SL_AVR_EMU_TICK_HPP_
 #define _SL_AVR_EMU_TICK_HPP_
 
-#include "sl_avr_emu_types.hpp"
+#include "sl_avr_emu_types.h"
 
 /**
  * @brief Simulates a clock tick for a given emulation

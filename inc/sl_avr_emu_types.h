@@ -1,5 +1,5 @@
 /**
- * @file sl_avr_emu_types.hpp
+ * @file sl_avr_emu_types.h
  * @author Ed Sandor (ed@ewsandor.com)
  * @brief Sandor Labs AVR Emulator Types Header
  * @version 0.1

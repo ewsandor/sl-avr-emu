@@ -1,5 +1,5 @@
 /**
- * @file sl_avr_emu_bitops.hpp
+ * @file sl_avr_emu_bitops.h
  * @author Ed Sandor (ed@ewsandor.com)
  * @brief Sandor Labs AVR Emulator Bit Operations Header
  * @version 0.1

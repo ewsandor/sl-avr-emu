@@ -11,19 +11,26 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "sl_avr_emu.hpp"
+#include "sl_avr_emu.h"
 
 /* Global flag to enable/disable verbose logging */
 bool sl_avr_emu_verbose_logging_enabled = true;
+
+sl_avr_emu_result_e sl_avr_emu_init(sl_avr_emu_emulation_s *emulation)
+{
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+
+  memset(emulation, 0, sizeof(sl_avr_emu_emulation_s));
+
+  return result;
+}
 
 int main(int argc, char *argv[])
 {
   sl_avr_emu_result_e    result;
   sl_avr_emu_emulation_s emulation;
 
-  memset(&emulation, 0, sizeof(sl_avr_emu_emulation_s));
-
-  emulation.memory.flash[0x8a41] = 1;
+  sl_avr_emu_init(&emulation);
 
   while(1)
   {

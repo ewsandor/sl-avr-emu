@@ -1,5 +1,5 @@
 /**
- * @file sl_avr_emu.hpp
+ * @file sl_avr_emu.h
  * @author Ed Sandor (ed@ewsandor.com)
  * @brief Sandor Labs AVR Emulator Main Header
  * @version 0.1
@@ -12,8 +12,10 @@
 #ifndef _SL_AVR_EMU_HPP_
 #define _SL_AVR_EMU_HPP_
 
-#include "sl_avr_emu_tick.hpp"
-#include "sl_avr_emu_types.hpp"
+#include <stdbool.h>
+
+#include "sl_avr_emu_tick.h"
+#include "sl_avr_emu_types.h"
 
 extern bool sl_avr_emu_verbose_logging_enabled;
 
