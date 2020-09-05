@@ -126,11 +126,11 @@ sl_avr_emu_result_e sl_avr_emu_load_hex(sl_avr_emu_emulation_s *emulation, char 
                   {
                     if( 0 == (i % 2) )
                     {
-                      emulation->memory.flash[flash_address_temp] = data[0];
+                      emulation->memory.flash[flash_address_temp] = data[i];
                     }
                     else 
                     {
-                      emulation->memory.flash[flash_address_temp] |= (data[1] << 8);
+                      emulation->memory.flash[flash_address_temp] |= (data[i] << 8);
                     }
                   }
                   else 
