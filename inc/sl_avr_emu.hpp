@@ -12,6 +12,11 @@
 #ifndef _SL_AVR_EMU_HPP_
 #define _SL_AVR_EMU_HPP_
 
+#include "sl_avr_emu_tick.hpp"
 #include "sl_avr_emu_types.hpp"
+
+extern bool sl_avr_emu_verbose_logging_enabled;
+
+#define SL_AVR_EMU_VERBOSE_LOG(log_command) { if(sl_avr_emu_verbose_logging_enabled) {log_command;} }
 
 #endif  //_SL_AVR_EMU_HPP_

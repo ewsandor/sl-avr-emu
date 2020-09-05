@@ -20,8 +20,10 @@
  */
 typedef enum
 {
-  SL_AVR_EMU_RESULT_SUCCESS = 0,
-  SL_AVR_EMU_RESULT_FAILURE = 1,
+  SL_AVR_EMU_RESULT_SUCCESS        = 0,
+  SL_AVR_EMU_RESULT_FAILURE        = 1,
+  SL_AVR_EMU_RESULT_INVALID_PC     = 2,
+  SL_AVR_EMU_RESULT_INVALID_OPCODE = 3,
 
 } sl_avr_emu_result_e;
 
@@ -30,6 +32,12 @@ typedef enum
  * 
  */
 typedef uint8_t sl_avr_emu_byte_t;
+
+/**
+ * @brief Emulation word type
+ * 
+ */
+typedef uint16_t sl_avr_emu_word_t;
 
 /**
  * @brief Emulation standard address type
@@ -52,6 +60,14 @@ typedef uint32_t sl_avr_emu_extended_address_t;
  * 
  */
 #define SL_AVR_EMU_FLASH_SIZE (1 << 16)
+
+#define SL_AVR_EMU_DATA_ADDRESS_VALID(address) \
+  ((address) < SL_AVR_EMU_DATA_SIZE)
+#define SL_AVR_EMU_FLASH_ADDRESS_VALID(address) \
+  ((address) < SL_AVR_EMU_FLASH_SIZE)
+#define SL_AVR_EMU_PC_ADDRESS_VALID(address) \
+  ((address) < SL_AVR_EMU_FLASH_SIZE)
+
 
 /**
  * @brief SREG Bit Assignments
@@ -123,16 +139,24 @@ typedef struct
   /* Data Memory Space */
   sl_avr_emu_byte_t data [SL_AVR_EMU_DATA_SIZE];
   /* Flash Memory Space */
-  sl_avr_emu_byte_t flash[SL_AVR_EMU_FLASH_SIZE];
+  sl_avr_emu_word_t flash[SL_AVR_EMU_FLASH_SIZE];
 
 } sl_avr_emu_memory_s;
 
+/**
+ * @brief Number of cycles related to an operation
+ * 
+ */
 typedef uint8_t sl_avr_emu_op_count_t;
 
+/**
+ * @brief Main structure for an emulation
+ * 
+ */
 typedef struct
 {
   /* Emulation Memory */
-  sl_avr_emu_memory_s memory;
+  sl_avr_emu_memory_s   memory;
 
   /* Cycles remaining for current operation.  
      Process as new op on tick if 0, else decrements 1 on tick */
