@@ -79,6 +79,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_jmp(sl_avr_emu_emulation_s * emulation)
   if(SL_AVR_EMU_PC_ADDRESS_VALID(emulation->memory.pc + 1))
   {
     emulation->memory.pc = emulation->memory.flash[emulation->memory.pc+1];
+    emulation->op_cycles_remaining = 2;
     SL_AVR_EMU_VERBOSE_LOG(printf("JMP. PC 0x%06x\n", emulation->memory.pc));
   }
   else
