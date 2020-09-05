@@ -1,0 +1,5 @@
+bin
+build
+sl_avr_emu
+*.o
+*.gch
