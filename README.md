@@ -1,3 +1,6 @@
-# Sandor Labs AVR Emulator
+Sandor Labs AVR Emulator
+========================
+**Ed Sandor** - September 2020
+-------------------------------
 
-Basic AVR Emulator to teach myself some details of microcontroller opcodes and memory concepts
+A basic AVR emulator to teach myself some details of microcontroller opcodes and memory concepts
