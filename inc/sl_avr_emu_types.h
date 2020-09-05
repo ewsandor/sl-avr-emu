@@ -20,10 +20,14 @@
  */
 typedef enum
 {
-  SL_AVR_EMU_RESULT_SUCCESS        = 0,
-  SL_AVR_EMU_RESULT_FAILURE        = 1,
-  SL_AVR_EMU_RESULT_INVALID_PC     = 2,
-  SL_AVR_EMU_RESULT_INVALID_OPCODE = 3,
+  SL_AVR_EMU_RESULT_SUCCESS               = 0,
+  SL_AVR_EMU_RESULT_FAILURE               = 1,
+  SL_AVR_EMU_RESULT_INVALID_DATA_ADDRESS  = 2,
+  SL_AVR_EMU_RESULT_INVALID_FLASH_ADDRESS = 3,
+  SL_AVR_EMU_RESULT_INVALID_PC            = 4,
+  SL_AVR_EMU_RESULT_INVALID_OPCODE        = 5,
+  SL_AVR_EMU_RESULT_INVALID_FILE_PATH     = 6,
+  SL_AVR_EMU_RESULT_INVALID_FILE_FORMAT   = 7,
 
 } sl_avr_emu_result_e;
 
@@ -49,6 +53,12 @@ typedef uint16_t sl_avr_emu_address_t;
  * 
  */
 typedef uint32_t sl_avr_emu_extended_address_t;
+
+/**
+ * @brief Emulation some number of bytes
+ * 
+ */
+typedef uint32_t sl_avr_emu_num_bytes;
 
 /**
  * @brief Data memory space size
