@@ -25,6 +25,7 @@
 #define SL_AVR_EMU_IS_LD_ST(opcode)      ((((opcode) & 0xFC0C) == 0x900C) && !SL_AVR_EMU_IS_PUSH_POP(opcode))
 #define SL_AVR_EMU_IS_LDI(opcode)        (((opcode) & 0xF000) == 0xE000)
 #define SL_AVR_EMU_IS_RJMP_RCALL(opcode) (((opcode) & 0xE000) == 0xC000)
+#define SL_AVR_EMU_IS_SEX_CLX(opcode)    (((opcode) & 0xFF0F) == 0x9408)
 
 sl_avr_emu_extended_address_t sl_avr_emu_get_x_address(sl_avr_emu_emulation_s * emulation)
 {
@@ -529,6 +530,31 @@ sl_avr_emu_result_e sl_avr_emu_opcode_ld_st(sl_avr_emu_emulation_s * emulation)
   return result;
 }
 
+sl_avr_emu_result_e sl_avr_emu_opcode_sex_clx(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+
+  bool                   set;
+  sl_avr_emu_bit_index_t mod_bit;
+
+  mod_bit = emulation->memory.flash[emulation->memory.pc] >> 4 & 0x7;
+  set = !SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 7);
+
+  emulation->memory.pc++;
+  if(set)
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, mod_bit);
+    SL_AVR_EMU_VERBOSE_LOG(printf("SEx. PC 0x%06x. sreg 0x%02x, mod_bit 0x%01x\n", emulation->memory.pc, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS], mod_bit));
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, mod_bit);
+    SL_AVR_EMU_VERBOSE_LOG(printf("CLx. PC 0x%06x. sreg 0x%02x, mod_bit 0x%01x\n", emulation->memory.pc, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS], mod_bit));
+  }
+
+  return result;
+}
+
 
 /**
  * @brief Opcodes with 0b10 prefix handling
@@ -551,6 +577,10 @@ sl_avr_emu_result_e sl_avr_emu_opcode_2(sl_avr_emu_emulation_s * emulation)
   else if(SL_AVR_EMU_IS_LD_ST(emulation->memory.flash[emulation->memory.pc]))
   {
     result = sl_avr_emu_opcode_ld_st(emulation);
+  }
+  else if(SL_AVR_EMU_IS_SEX_CLX(emulation->memory.flash[emulation->memory.pc]))
+  {
+    result = sl_avr_emu_opcode_sex_clx(emulation);
   }
   else
   {
