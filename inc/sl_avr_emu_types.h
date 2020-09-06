@@ -47,6 +47,12 @@ typedef uint8_t sl_avr_emu_byte_t;
 typedef uint16_t sl_avr_emu_word_t;
 
 /**
+ * @brief Emulation bit index type
+ * 
+ */
+typedef uint8_t sl_avr_emu_bit_index_t;
+
+/**
  * @brief Emulation standard address type
  * 
  */

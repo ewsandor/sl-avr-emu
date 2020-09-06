@@ -15,6 +15,7 @@
 #include "sl_avr_emu_bitops.h"
 #include "sl_avr_emu_tick.h"
 
+#define SL_AVR_EMU_IS_BRBS_BRBC(opcode)  (((opcode) & 0xF800) == 0xF000)
 #define SL_AVR_EMU_IS_CP_CPC(opcode)     (((opcode) & 0xEC00) == 0x0400)
 #define SL_AVR_EMU_IS_CPI(opcode)        (((opcode) & 0xF000) == 0x3000)
 #define SL_AVR_EMU_IS_EOR(opcode)        (((opcode) & 0xFC00) == 0x2400)
@@ -475,6 +476,52 @@ sl_avr_emu_result_e sl_avr_emu_opcode_ldi(sl_avr_emu_emulation_s * emulation)
   return result;
 }
 
+sl_avr_emu_result_e sl_avr_emu_opcode_brbs_brbc(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_extended_address_t pc_prev;
+  sl_avr_emu_extended_address_t pc_relative;
+  bool                          check_set, check;
+  sl_avr_emu_bit_index_t        check_bit;
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+
+  pc_prev     = emulation->memory.pc;
+  pc_relative = (emulation->memory.flash[emulation->memory.pc] >> 3) & 0x7F;
+  check_bit   =  emulation->memory.flash[emulation->memory.pc] & 0x7;
+  check_set   = !SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 10);
+
+  check = (SL_AVR_EMU_CHECK_SREG_BIT(*emulation, check_bit) == check_set);
+
+  if(check)
+  {
+    if(SL_AVR_EMU_CHECK_BIT(pc_relative, 6))
+    { 
+      SL_AVR_EMU_SET_BIT(pc_relative, 7);
+      emulation->memory.pc += (1 + (int8_t) pc_relative);
+    }
+    else
+    {
+      emulation->memory.pc += (1 + pc_relative);
+    }
+    emulation->op_cycles_remaining = 1;
+  }
+  else 
+  {
+    emulation->memory.pc++;
+  }
+
+  if(check_set)
+  {
+    SL_AVR_EMU_VERBOSE_LOG(printf("BRBS. PC 0x%06x. sreg 0x%04x, check %d, relative_pc 0x%x\n", emulation->memory.pc, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS], check, pc_relative));
+  }
+  else 
+  {
+    SL_AVR_EMU_VERBOSE_LOG(printf("BRBC. PC 0x%06x. sreg 0x%04x, check %d, relative_pc 0x%x\n", emulation->memory.pc, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS], check, pc_relative));
+  }
+
+  return result;
+}
+
+
 sl_avr_emu_result_e sl_avr_emu_opcode_rjmp_rcall(sl_avr_emu_emulation_s * emulation)
 {
   sl_avr_emu_extended_address_t pc_prev;
@@ -484,10 +531,10 @@ sl_avr_emu_result_e sl_avr_emu_opcode_rjmp_rcall(sl_avr_emu_emulation_s * emulat
   pc_prev     = emulation->memory.pc;
   pc_relative = emulation->memory.flash[emulation->memory.pc] & 0x0FFF;
 
-  if(SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[pc_prev], 11))
+  if(SL_AVR_EMU_CHECK_BIT(pc_relative, 11))
   { 
-    pc_relative = (~pc_relative)+1;
-    emulation->memory.pc += (1 - pc_relative);
+    pc_relative |= 0xF000;
+    emulation->memory.pc += (1 + (int16_t) pc_relative);
   }
   else
   {
@@ -530,7 +577,12 @@ sl_avr_emu_result_e sl_avr_emu_opcode_rjmp_rcall(sl_avr_emu_emulation_s * emulat
 sl_avr_emu_result_e sl_avr_emu_opcode_3(sl_avr_emu_emulation_s * emulation)
 {
   sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
-  if(SL_AVR_EMU_IS_LDI(emulation->memory.flash[emulation->memory.pc]))
+
+  if(SL_AVR_EMU_IS_BRBS_BRBC(emulation->memory.flash[emulation->memory.pc]))
+  {
+    result = sl_avr_emu_opcode_brbs_brbc(emulation);
+  }
+  else if(SL_AVR_EMU_IS_LDI(emulation->memory.flash[emulation->memory.pc]))
   {
     result = sl_avr_emu_opcode_ldi(emulation);
   }
