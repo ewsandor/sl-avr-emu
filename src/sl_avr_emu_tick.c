@@ -15,6 +15,7 @@
 #include "sl_avr_emu_bitops.h"
 #include "sl_avr_emu_tick.h"
 
+#define SL_AVR_EMU_IS_CP_CPC(opcode)     (((opcode) & 0xEC00) == 0x0400)
 #define SL_AVR_EMU_IS_CPI(opcode)        (((opcode) & 0xF000) == 0x3000)
 #define SL_AVR_EMU_IS_EOR(opcode)        (((opcode) & 0xFC00) == 0x2400)
 #define SL_AVR_EMU_IS_IN_OUT(opcode)     (((opcode) & 0xF000) == 0xB000)
@@ -97,21 +98,31 @@ sl_avr_emu_result_e sl_avr_emu_opcode_unsupported(sl_avr_emu_emulation_s * emula
   return SL_AVR_EMU_RESULT_UNSUPPORTED_OPCODE;
 }
 
-sl_avr_emu_result_e sl_avr_emu_opcode_cpi(sl_avr_emu_emulation_s * emulation)
+sl_avr_emu_result_e sl_avr_emu_opcode_cp_cpc(sl_avr_emu_emulation_s * emulation)
 {
   sl_avr_emu_result_e  result = SL_AVR_EMU_RESULT_SUCCESS;
-  sl_avr_emu_byte_t    compare = 0;
-  sl_avr_emu_byte_t    k_data = 0;
+  sl_avr_emu_byte_t    compare, d_data, r_data;
+  sl_avr_emu_address_t source      = 0;
   sl_avr_emu_address_t destination = 0;
+  bool with_carry;
 
-  k_data      = (emulation->memory.flash[emulation->memory.pc] & 0xF) | ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0xF0);
-  destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0xF) | 0x10;
+  source      = (emulation->memory.flash[emulation->memory.pc] & 0xF) | ((emulation->memory.flash[emulation->memory.pc] >> 5) & 0x10);
+  destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0x1F);
+  with_carry  = !SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 12);
 
-  compare = emulation->memory.flash[emulation->memory.pc] - k_data;
+  r_data = emulation->memory.data[source];
+  d_data = emulation->memory.data[destination];
 
-  if( (!SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 3) && SL_AVR_EMU_CHECK_BIT(k_data, 3)) ||
-       (SL_AVR_EMU_CHECK_BIT(compare, 3) && SL_AVR_EMU_CHECK_BIT(k_data, 3))                                       ||
-      (!SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 3) && SL_AVR_EMU_CHECK_BIT(compare, 3)) )
+  compare = d_data - r_data;
+
+  if(with_carry && SL_AVR_EMU_CHECK_SREG_BIT(*emulation, SL_AVR_EMU_SREG_CARRY_FLAG))
+  {
+    compare--;
+  }
+
+  if( (!SL_AVR_EMU_CHECK_BIT(d_data, 3)  && SL_AVR_EMU_CHECK_BIT(r_data, 3))  ||
+       (SL_AVR_EMU_CHECK_BIT(compare, 3) && SL_AVR_EMU_CHECK_BIT(r_data, 3)) ||
+      (!SL_AVR_EMU_CHECK_BIT(d_data, 3)  && SL_AVR_EMU_CHECK_BIT(compare, 3)) )
   {
     SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_HALF_CARRY_FLAG);
   }
@@ -120,8 +131,8 @@ sl_avr_emu_result_e sl_avr_emu_opcode_cpi(sl_avr_emu_emulation_s * emulation)
     SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_HALF_CARRY_FLAG);
   }
 
-  if( (SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 7) && !SL_AVR_EMU_CHECK_BIT(k_data, 7) && !SL_AVR_EMU_CHECK_BIT(compare, 7)) ||
-      (!SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 7) && SL_AVR_EMU_CHECK_BIT(k_data, 7) && SL_AVR_EMU_CHECK_BIT(compare, 7)) )
+  if(  (SL_AVR_EMU_CHECK_BIT(d_data, 7) && !SL_AVR_EMU_CHECK_BIT(r_data, 7) && !SL_AVR_EMU_CHECK_BIT(compare, 7)) ||
+      (!SL_AVR_EMU_CHECK_BIT(d_data, 7) &&  SL_AVR_EMU_CHECK_BIT(r_data, 7) &&  SL_AVR_EMU_CHECK_BIT(compare, 7)) )
   {
     SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
   }
@@ -130,7 +141,93 @@ sl_avr_emu_result_e sl_avr_emu_opcode_cpi(sl_avr_emu_emulation_s * emulation)
     SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
   }
 
-  if( SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 7) )
+  if( SL_AVR_EMU_CHECK_BIT(d_data, 7) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
+  }
+
+  if(0 == compare && (!with_carry || (with_carry && SL_AVR_EMU_CHECK_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG))) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
+  }
+
+  if( (!SL_AVR_EMU_CHECK_BIT(d_data, 7)  && SL_AVR_EMU_CHECK_BIT(r_data, 7)) ||
+       (SL_AVR_EMU_CHECK_BIT(compare, 7) && SL_AVR_EMU_CHECK_BIT(r_data, 7)) ||
+      (!SL_AVR_EMU_CHECK_BIT(d_data, 7)  && SL_AVR_EMU_CHECK_BIT(compare, 7)) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_CARRY_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_CARRY_FLAG);
+  }
+
+  if(SL_AVR_EMU_CHECK_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG) ^ SL_AVR_EMU_CHECK_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG))
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_SIGN_FLAG);
+  }
+  else
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_SIGN_FLAG);
+  }
+
+  emulation->memory.pc++;
+
+  if(with_carry)
+  {
+    SL_AVR_EMU_VERBOSE_LOG(printf("CPC. PC 0x%06x. sreg 0x%04x, d_data 0x%04x, r_data 0x%02x\n", emulation->memory.pc, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS], d_data, r_data));
+  }
+  else 
+  {
+    SL_AVR_EMU_VERBOSE_LOG(printf("CP. PC 0x%06x. sreg 0x%04x, d_data 0x%04x, r_data 0x%02x\n", emulation->memory.pc, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS], d_data, r_data));
+  }
+
+  return result;
+}
+
+
+sl_avr_emu_result_e sl_avr_emu_opcode_cpi(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_result_e  result = SL_AVR_EMU_RESULT_SUCCESS;
+  sl_avr_emu_byte_t    compare, d_data, k_data;
+  sl_avr_emu_address_t destination = 0;
+
+  k_data      = (emulation->memory.flash[emulation->memory.pc] & 0xF) | ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0xF0);
+  destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0xF) | 0x10;
+
+  compare = emulation->memory.flash[emulation->memory.pc] - k_data;
+  d_data = emulation->memory.data[destination];
+
+  if( (!SL_AVR_EMU_CHECK_BIT(d_data, 3)  && SL_AVR_EMU_CHECK_BIT(k_data, 3))  ||
+       (SL_AVR_EMU_CHECK_BIT(compare, 3) && SL_AVR_EMU_CHECK_BIT(k_data, 3)) ||
+      (!SL_AVR_EMU_CHECK_BIT(d_data, 3)  && SL_AVR_EMU_CHECK_BIT(compare, 3)) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_HALF_CARRY_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_HALF_CARRY_FLAG);
+  }
+
+  if(  (SL_AVR_EMU_CHECK_BIT(d_data, 7) && !SL_AVR_EMU_CHECK_BIT(k_data, 7) && !SL_AVR_EMU_CHECK_BIT(compare, 7)) ||
+      (!SL_AVR_EMU_CHECK_BIT(d_data, 7) &&  SL_AVR_EMU_CHECK_BIT(k_data, 7) &&  SL_AVR_EMU_CHECK_BIT(compare, 7)) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
+  }
+
+  if( SL_AVR_EMU_CHECK_BIT(d_data, 7) )
   {
     SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
   }
@@ -148,9 +245,9 @@ sl_avr_emu_result_e sl_avr_emu_opcode_cpi(sl_avr_emu_emulation_s * emulation)
     SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
   }
 
-  if( (!SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 7) && SL_AVR_EMU_CHECK_BIT(k_data, 7)) ||
+  if( (!SL_AVR_EMU_CHECK_BIT(d_data, 7) && SL_AVR_EMU_CHECK_BIT(k_data, 7)) ||
        (SL_AVR_EMU_CHECK_BIT(compare, 7) && SL_AVR_EMU_CHECK_BIT(k_data, 7))                                       ||
-      (!SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 7) && SL_AVR_EMU_CHECK_BIT(compare, 7)) )
+      (!SL_AVR_EMU_CHECK_BIT(d_data, 7) && SL_AVR_EMU_CHECK_BIT(compare, 7)) )
   {
     SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_CARRY_FLAG);
   }
@@ -227,6 +324,10 @@ sl_avr_emu_result_e sl_avr_emu_opcode_0(sl_avr_emu_emulation_s * emulation)
     /* NOP Handling */
     emulation->memory.pc++;
     SL_AVR_EMU_VERBOSE_LOG(printf("NOP. PC 0x%06x\n", emulation->memory.pc));
+  }
+  else if(SL_AVR_EMU_IS_CP_CPC(emulation->memory.flash[emulation->memory.pc]))
+  {
+    sl_avr_emu_opcode_cp_cpc(emulation);
   }
   else if(SL_AVR_EMU_IS_CPI(emulation->memory.flash[emulation->memory.pc]))
   {
