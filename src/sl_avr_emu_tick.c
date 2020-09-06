@@ -15,6 +15,7 @@
 #include "sl_avr_emu_bitops.h"
 #include "sl_avr_emu_tick.h"
 
+#define SL_AVR_EMU_IS_CPI(opcode)        (((opcode) & 0xF000) == 0x3000)
 #define SL_AVR_EMU_IS_EOR(opcode)        (((opcode) & 0xFC00) == 0x2400)
 #define SL_AVR_EMU_IS_IN_OUT(opcode)     (((opcode) & 0xF000) == 0xB000)
 #define SL_AVR_EMU_IS_JMP_CALL(opcode)   (((opcode) & 0xFE0C) == 0x940C)
@@ -96,6 +97,83 @@ sl_avr_emu_result_e sl_avr_emu_opcode_unsupported(sl_avr_emu_emulation_s * emula
   return SL_AVR_EMU_RESULT_UNSUPPORTED_OPCODE;
 }
 
+sl_avr_emu_result_e sl_avr_emu_opcode_cpi(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_result_e  result = SL_AVR_EMU_RESULT_SUCCESS;
+  sl_avr_emu_byte_t    compare = 0;
+  sl_avr_emu_byte_t    k_data = 0;
+  sl_avr_emu_address_t destination = 0;
+
+  k_data      = (emulation->memory.flash[emulation->memory.pc] & 0xF) | ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0xF0);
+  destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0xF) | 0x10;
+
+  compare = emulation->memory.flash[emulation->memory.pc] - k_data;
+
+  if( (!SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 3) && SL_AVR_EMU_CHECK_BIT(k_data, 3)) ||
+       (SL_AVR_EMU_CHECK_BIT(compare, 3) && SL_AVR_EMU_CHECK_BIT(k_data, 3))                                       ||
+      (!SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 3) && SL_AVR_EMU_CHECK_BIT(compare, 3)) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_HALF_CARRY_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_HALF_CARRY_FLAG);
+  }
+
+  if( (SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 7) && !SL_AVR_EMU_CHECK_BIT(k_data, 7) && !SL_AVR_EMU_CHECK_BIT(compare, 7)) ||
+      (!SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 7) && SL_AVR_EMU_CHECK_BIT(k_data, 7) && SL_AVR_EMU_CHECK_BIT(compare, 7)) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
+  }
+
+  if( SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 7) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
+  }
+
+  if(0 == compare)
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
+  }
+
+  if( (!SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 7) && SL_AVR_EMU_CHECK_BIT(k_data, 7)) ||
+       (SL_AVR_EMU_CHECK_BIT(compare, 7) && SL_AVR_EMU_CHECK_BIT(k_data, 7))                                       ||
+      (!SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 7) && SL_AVR_EMU_CHECK_BIT(compare, 7)) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_CARRY_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_CARRY_FLAG);
+  }
+
+  if(SL_AVR_EMU_CHECK_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG) ^ SL_AVR_EMU_CHECK_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG))
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_SIGN_FLAG);
+  }
+  else
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_SIGN_FLAG);
+  }
+
+  emulation->memory.pc++;
+  SL_AVR_EMU_VERBOSE_LOG(printf("CPI. PC 0x%06x. sreg 0x%04x, data 0x%04x, k_data 0x%02x\n", emulation->memory.pc, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS], emulation->memory.data[destination], k_data));
+
+  return result;
+}
+
 sl_avr_emu_result_e sl_avr_emu_opcode_eor(sl_avr_emu_emulation_s * emulation)
 {
   sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
@@ -135,7 +213,6 @@ sl_avr_emu_result_e sl_avr_emu_opcode_eor(sl_avr_emu_emulation_s * emulation)
   return result;
 }
 
-
 /**
  * @brief Opcodes with 0b00 prefix handling
  * 
@@ -150,6 +227,10 @@ sl_avr_emu_result_e sl_avr_emu_opcode_0(sl_avr_emu_emulation_s * emulation)
     /* NOP Handling */
     emulation->memory.pc++;
     SL_AVR_EMU_VERBOSE_LOG(printf("NOP. PC 0x%06x\n", emulation->memory.pc));
+  }
+  else if(SL_AVR_EMU_IS_CPI(emulation->memory.flash[emulation->memory.pc]))
+  {
+    sl_avr_emu_opcode_cpi(emulation);
   }
   else if(SL_AVR_EMU_IS_EOR(emulation->memory.flash[emulation->memory.pc]))
   {
@@ -383,6 +464,7 @@ sl_avr_emu_result_e sl_avr_emu_tick(sl_avr_emu_emulation_s * emulation)
   {
     if(SL_AVR_EMU_PC_ADDRESS_VALID(emulation->memory.pc))
     {
+      SL_AVR_EMU_VERBOSE_LOG(printf("PC 0x%06x. OP 0x%04x.\n", emulation->memory.pc, emulation->memory.flash[emulation->memory.pc]));
       switch (emulation->memory.flash[emulation->memory.pc] >> (16-2)) {
         case 0b00:
         {
