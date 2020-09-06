@@ -15,10 +15,11 @@
 #include "sl_avr_emu_bitops.h"
 #include "sl_avr_emu_tick.h"
 
-#define SL_AVR_EMU_IS_EOR(opcode)       (((opcode) & 0xFC00) == 0x2400)
-#define SL_AVR_EMU_IS_IN_OUT(opcode)    (((opcode) & 0xF000) == 0xB000)
-#define SL_AVR_EMU_IS_JMP_CALL(opcode)  (((opcode) & 0xFE0C) == 0x940C)
-#define SL_AVR_EMU_IS_LDI(opcode)       (((opcode) & 0xF000) == 0xE000)
+#define SL_AVR_EMU_IS_EOR(opcode)        (((opcode) & 0xFC00) == 0x2400)
+#define SL_AVR_EMU_IS_IN_OUT(opcode)     (((opcode) & 0xF000) == 0xB000)
+#define SL_AVR_EMU_IS_JMP_CALL(opcode)   (((opcode) & 0xFE0C) == 0x940C)
+#define SL_AVR_EMU_IS_LDI(opcode)        (((opcode) & 0xF000) == 0xE000)
+#define SL_AVR_EMU_IS_RJMP_RCALL(opcode) (((opcode) & 0xE000) == 0xC000)
 
 sl_avr_emu_result_e sl_avr_emu_stack_push_byte(sl_avr_emu_emulation_s * emulation, sl_avr_emu_byte_t byte)
 {
@@ -195,15 +196,15 @@ sl_avr_emu_result_e sl_avr_emu_opcode_in_out(sl_avr_emu_emulation_s * emulation)
 
   if(SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 11))
   {
+    emulation->memory.pc++;
     emulation->memory.data[SL_AVR_EMU_IO_TO_DATA_ADDRESS(io_address)] = emulation->memory.data[destination];
     SL_AVR_EMU_VERBOSE_LOG(printf("OUT. PC 0x%06x.   io 0x%04x, data 0x%04x\n", emulation->memory.pc, io_address, emulation->memory.data[SL_AVR_EMU_IO_TO_DATA_ADDRESS(io_address)]));
   }
   else {
+    emulation->memory.pc++;
     emulation->memory.data[destination] = emulation->memory.data[SL_AVR_EMU_IO_TO_DATA_ADDRESS(io_address)];
     SL_AVR_EMU_VERBOSE_LOG(printf("IN. PC 0x%06x. dest 0x%04x, data 0x%04x\n", emulation->memory.pc, destination, emulation->memory.data[destination]));
   }
-
-  emulation->memory.pc++;
 
   return result;
 }
@@ -224,7 +225,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_jmp_call(sl_avr_emu_emulation_s * emulatio
     emulation->memory.pc |= ((emulation->memory.flash[pc_prev] & 0x1  ) << 16);
     emulation->memory.pc |= ((emulation->memory.flash[pc_prev] & 0x1F0) << 13);
 
-    if(0 != (emulation->memory.flash[emulation->memory.pc] & 0x2))
+    if(0 != (emulation->memory.flash[pc_prev] & 0x2))
     {
       result = slf_var_emu_stack_push_pc(emulation, (pc_prev + 2));
       emulation->op_cycles_remaining = (SL_AVR_EMU_VERSION_AVRE == emulation->version)?3:2;
@@ -285,13 +286,58 @@ sl_avr_emu_result_e sl_avr_emu_opcode_ldi(sl_avr_emu_emulation_s * emulation)
 
   SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
 
+  emulation->memory.pc++;
   emulation->memory.data[destination] = k_data;
   SL_AVR_EMU_VERBOSE_LOG(printf("LDI. PC 0x%06x. dest 0x%04x, data 0x%04x\n", emulation->memory.pc, destination, k_data));
 
-  emulation->memory.pc++;
+  return result;
+}
+
+sl_avr_emu_result_e sl_avr_emu_opcode_rjmp_rcall(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_extended_address_t pc_prev;
+  sl_avr_emu_extended_address_t pc_relative;
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+
+  pc_prev     = emulation->memory.pc;
+  pc_relative = emulation->memory.flash[emulation->memory.pc] & 0x0FFF;
+
+  if(SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[pc_prev], 11))
+  { 
+    pc_relative = (~pc_relative)+1;
+    emulation->memory.pc += (1 - pc_relative);
+  }
+  else
+  {
+    emulation->memory.pc += (1 + pc_relative);
+  }
+
+  if(SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[pc_prev], 12))
+  {
+    result = slf_var_emu_stack_push_pc(emulation, (pc_prev + 1));
+    emulation->op_cycles_remaining = (SL_AVR_EMU_VERSION_AVRE == emulation->version || SL_AVR_EMU_VERSION_AVRRC == emulation->version)?2:1;
+    if(SL_AVR_EMU_EXTENDED_PC_ADDRESS)
+    {
+      if(SL_AVR_EMU_VERSION_AVRRC == emulation->version)
+      {
+        result = sl_avr_emu_opcode_unsupported(emulation);
+      }
+      else
+      {
+        emulation->op_cycles_remaining++;
+      }
+    }
+    SL_AVR_EMU_VERBOSE_LOG(printf("RCALL. PC 0x%06x\n", emulation->memory.pc));
+  }
+  else
+  {
+    emulation->op_cycles_remaining = 1;
+    SL_AVR_EMU_VERBOSE_LOG(printf("RJMP. PC 0x%06x\n", emulation->memory.pc));
+  }
 
   return result;
 }
+
 
 /**
  * @brief Opcodes with 0b11 prefix handling
@@ -305,6 +351,10 @@ sl_avr_emu_result_e sl_avr_emu_opcode_3(sl_avr_emu_emulation_s * emulation)
   if(SL_AVR_EMU_IS_LDI(emulation->memory.flash[emulation->memory.pc]))
   {
     result = sl_avr_emu_opcode_ldi(emulation);
+  }
+  else if(SL_AVR_EMU_IS_RJMP_RCALL(emulation->memory.flash[emulation->memory.pc]))
+  {
+    result = sl_avr_emu_opcode_rjmp_rcall(emulation);
   }
   else
   {
