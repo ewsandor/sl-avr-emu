@@ -24,6 +24,7 @@
 #define SL_AVR_EMU_IS_PUSH_POP(opcode)   (((opcode) & 0xFC0F) == 0x900F)
 #define SL_AVR_EMU_IS_LD_ST(opcode)      ((((opcode) & 0xFC0C) == 0x900C) && !SL_AVR_EMU_IS_PUSH_POP(opcode))
 #define SL_AVR_EMU_IS_LDI(opcode)        (((opcode) & 0xF000) == 0xE000)
+#define SL_AVR_EMU_IS_LDS_STS(opcode)    (((opcode) & 0xFC0F) == 0x9000)
 #define SL_AVR_EMU_IS_ORI(opcode)        (((opcode) & 0xF000) == 0x6000)
 #define SL_AVR_EMU_IS_RJMP_RCALL(opcode) (((opcode) & 0xE000) == 0xC000)
 #define SL_AVR_EMU_IS_SEX_CLX(opcode)    (((opcode) & 0xFF0F) == 0x9408)
@@ -572,6 +573,53 @@ sl_avr_emu_result_e sl_avr_emu_opcode_ld_st(sl_avr_emu_emulation_s * emulation)
   return result;
 }
 
+sl_avr_emu_result_e sl_avr_emu_opcode_lds_sts(sl_avr_emu_emulation_s * emulation)
+{
+  bool set;
+  sl_avr_emu_extended_address_t destination;
+  sl_avr_emu_extended_address_t ram_address;
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+
+  if(SL_AVR_EMU_VERSION_AVRRC == emulation->version)
+  {
+    /* TODO RC version support */
+    result = sl_avr_emu_opcode_unsupported(emulation);
+  }
+  else if(SL_AVR_EMU_PC_ADDRESS_VALID(emulation->memory.pc + 1))
+  {
+    set = SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 9);
+    destination = (emulation->memory.flash[emulation->memory.pc] >> 4) & 0x1F;
+    ram_address = emulation->memory.flash[emulation->memory.pc + 1];
+    if(SL_AVR_EMU_EXTENDED_DATA_ADDRESS)
+    {
+      ram_address |= (emulation->memory.data[SL_AVR_EMU_RAMPD_ADDRESS] << 16);
+    }
+
+    emulation->memory.pc += 2;
+    if(set)
+    {
+      emulation->memory.data[ram_address] = emulation->memory.data[destination];
+      SL_AVR_EMU_VERBOSE_LOG(printf("STS. PC 0x%06x. ram_address 0x%06x, dest 0x%02x, r_data 0x%02x\n", emulation->memory.pc, ram_address, destination, emulation->memory.data[destination]));
+
+      emulation->op_cycles_remaining = 1;
+    }
+    else
+    {
+      emulation->memory.data[destination] = emulation->memory.data[ram_address];
+      SL_AVR_EMU_VERBOSE_LOG(printf("LDS. PC 0x%06x. ram_address 0x%06x, dest 0x%02x, r_data 0x%02x\n", emulation->memory.pc, ram_address, destination, emulation->memory.data[destination]));
+
+      emulation->op_cycles_remaining = (SL_AVR_EMU_VERSION_AVRE == emulation->version)?1:2;
+    }
+  }
+  else
+  {
+    result = sl_avr_emu_opcode_unrecognized(emulation);
+  }
+
+  return result;
+}
+
+
 sl_avr_emu_result_e sl_avr_emu_opcode_sex_clx(sl_avr_emu_emulation_s * emulation)
 {
   sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
@@ -619,6 +667,10 @@ sl_avr_emu_result_e sl_avr_emu_opcode_2(sl_avr_emu_emulation_s * emulation)
   else if(SL_AVR_EMU_IS_LD_ST(emulation->memory.flash[emulation->memory.pc]))
   {
     result = sl_avr_emu_opcode_ld_st(emulation);
+  }
+  else if(SL_AVR_EMU_IS_LDS_STS(emulation->memory.flash[emulation->memory.pc]))
+  {
+    result = sl_avr_emu_opcode_lds_sts(emulation);
   }
   else if(SL_AVR_EMU_IS_SEX_CLX(emulation->memory.flash[emulation->memory.pc]))
   {
