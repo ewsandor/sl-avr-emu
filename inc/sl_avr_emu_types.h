@@ -26,8 +26,10 @@ typedef enum
   SL_AVR_EMU_RESULT_INVALID_FLASH_ADDRESS = 3,
   SL_AVR_EMU_RESULT_INVALID_PC            = 4,
   SL_AVR_EMU_RESULT_INVALID_OPCODE        = 5,
-  SL_AVR_EMU_RESULT_INVALID_FILE_PATH     = 6,
-  SL_AVR_EMU_RESULT_INVALID_FILE_FORMAT   = 7,
+  SL_AVR_EMU_RESULT_STACK_OVERFLOW        = 6,
+  SL_AVR_EMU_RESULT_STACK_UNDERFLOW       = 7,
+  SL_AVR_EMU_RESULT_INVALID_FILE_PATH     = 8,
+  SL_AVR_EMU_RESULT_INVALID_FILE_FORMAT   = 9,
 
 } sl_avr_emu_result_e;
 
@@ -71,13 +73,40 @@ typedef uint32_t sl_avr_emu_num_bytes;
  */
 #define SL_AVR_EMU_FLASH_SIZE (1 << 16)
 
+/**
+ * @brief Checks if a given Data Address is valid
+ * 
+ */
 #define SL_AVR_EMU_DATA_ADDRESS_VALID(address) \
   ((address) < SL_AVR_EMU_DATA_SIZE)
+/**
+ * @brief Checks if a given Flash Address is valid
+ * 
+ */
 #define SL_AVR_EMU_FLASH_ADDRESS_VALID(address) \
   ((address) < SL_AVR_EMU_FLASH_SIZE)
+/**
+ * @brief Checks if a given PC address is valid
+ * 
+ */
 #define SL_AVR_EMU_PC_ADDRESS_VALID(address) \
   ((address) < SL_AVR_EMU_FLASH_SIZE)
 
+/**
+ * @brief Determine if extended data addressing is in use
+ * 
+ */
+#define SL_AVR_EMU_EXTENDED_DATA_ADDRESS (SL_AVR_EMU_DATA_SIZE >= (1 << 16))
+/**
+ * @brief Determine if extended flash addressing is in use
+ * 
+ */
+#define SL_AVR_EMU_EXTENDED_FLASH_ADDRESS (SL_AVR_EMU_FLASH_SIZE >= (1 << 16))
+/**
+ * @brief Determine if extended PC addressing is in use
+ * 
+ */
+#define SL_AVR_EMU_EXTENDED_PC_ADDRESS (SL_AVR_EMU_FLASH_SIZE >= (1 << 16))
 
 /**
  * @brief SREG Bit Assignments

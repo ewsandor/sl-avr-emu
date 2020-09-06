@@ -15,8 +15,59 @@
 #include "sl_avr_emu_bitops.h"
 #include "sl_avr_emu_tick.h"
 
-#define SL_AVR_EMU_IS_JMP(opcode)  (((opcode) & 0xFE0C) == 0x940C)
-#define SL_AVR_EMU_IS_CALL(opcode) (((opcode) & 0xFE0C) == 0x940E)
+#define SL_AVR_EMU_IS_JMP_CALL(opcode)  (((opcode) & 0xFE0C) == 0x940C)
+
+sl_avr_emu_result_e sl_avr_emu_stack_push_byte(sl_avr_emu_emulation_s * emulation, sl_avr_emu_byte_t byte)
+{
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+  sl_avr_emu_extended_address_t sp = emulation->memory.data[SL_AVR_EMU_SPL_ADDRESS];
+
+  if(SL_AVR_EMU_EXTENDED_DATA_ADDRESS)
+  {
+    sp |= (emulation->memory.data[SL_AVR_EMU_SPH_ADDRESS] << 8);
+  }
+
+  if(SL_AVR_EMU_DATA_ADDRESS_VALID(sp))
+  {
+    emulation->memory.data[sp] = byte;
+    if(sp > 0)
+    {
+      sp--;
+      emulation->memory.data[SL_AVR_EMU_SPL_ADDRESS] = (sp & 0xFF);
+      if(SL_AVR_EMU_EXTENDED_DATA_ADDRESS)
+      {
+        emulation->memory.data[SL_AVR_EMU_SPH_ADDRESS] = ((sp >> 8) & 0xFF);
+      }
+    }
+    else 
+    {
+      result = SL_AVR_EMU_RESULT_STACK_OVERFLOW;
+    }
+  }
+  else 
+  {
+    result = SL_AVR_EMU_RESULT_INVALID_DATA_ADDRESS;
+  }
+
+  return result;
+}
+
+sl_avr_emu_result_e slf_var_emu_stack_push_pc(sl_avr_emu_emulation_s * emulation, sl_avr_emu_extended_address_t pc)
+{
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+
+  result = sl_avr_emu_stack_push_byte(emulation, (pc & 0xFF));
+  if(SL_AVR_EMU_RESULT_SUCCESS == result)
+  { 
+    result = sl_avr_emu_stack_push_byte(emulation, ((pc >> 8) & 0xFF));
+  }
+  if(SL_AVR_EMU_EXTENDED_PC_ADDRESS && SL_AVR_EMU_RESULT_SUCCESS == result)
+  {
+    result = sl_avr_emu_stack_push_byte(emulation, ((pc >> 16) & 0xFF));
+  }
+  
+  return result;
+}
 
 sl_avr_emu_result_e sl_avr_emu_opcode_unrecognized(sl_avr_emu_emulation_s * emulation)
 {
@@ -73,14 +124,28 @@ sl_avr_emu_result_e sl_avr_emu_opcode_1(sl_avr_emu_emulation_s * emulation)
   return result;
 }
 
-sl_avr_emu_result_e sl_avr_emu_opcode_jmp(sl_avr_emu_emulation_s * emulation)
+sl_avr_emu_result_e sl_avr_emu_opcode_jmp_call(sl_avr_emu_emulation_s * emulation)
 {
+  sl_avr_emu_extended_address_t pc_prev;
   sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
   if(SL_AVR_EMU_PC_ADDRESS_VALID(emulation->memory.pc + 1))
   {
-    emulation->memory.pc = emulation->memory.flash[emulation->memory.pc+1];
-    emulation->op_cycles_remaining = 2;
-    SL_AVR_EMU_VERBOSE_LOG(printf("JMP. PC 0x%06x\n", emulation->memory.pc));
+    pc_prev = emulation->memory.pc;
+    emulation->memory.pc = emulation->memory.flash[pc_prev+1];
+    emulation->memory.pc |= ((emulation->memory.flash[pc_prev] & 0x1  ) << 16);
+    emulation->memory.pc |= ((emulation->memory.flash[pc_prev] & 0x1F0) << 13);
+
+    if(0 != (emulation->memory.flash[emulation->memory.pc] & 0x2))
+    {
+      result = slf_var_emu_stack_push_pc(emulation, (pc_prev + 2));
+      emulation->op_cycles_remaining = 2;
+      SL_AVR_EMU_VERBOSE_LOG(printf("CALL. PC 0x%06x\n", emulation->memory.pc));
+    }
+    else
+    {
+      emulation->op_cycles_remaining = 2;
+      SL_AVR_EMU_VERBOSE_LOG(printf("JMP. PC 0x%06x\n", emulation->memory.pc));
+    }
   }
   else
   {
@@ -99,9 +164,9 @@ sl_avr_emu_result_e sl_avr_emu_opcode_2(sl_avr_emu_emulation_s * emulation)
 {
   sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
 
-  if( SL_AVR_EMU_IS_JMP(emulation->memory.flash[emulation->memory.pc]) )
+  if( SL_AVR_EMU_IS_JMP_CALL(emulation->memory.flash[emulation->memory.pc]) )
   {
-    result = sl_avr_emu_opcode_jmp(emulation);
+    result = sl_avr_emu_opcode_jmp_call(emulation);
   }
   else
   {
