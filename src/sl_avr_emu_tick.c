@@ -15,6 +15,8 @@
 #include "sl_avr_emu_bitops.h"
 #include "sl_avr_emu_tick.h"
 
+#define SL_AVR_EMU_IS_EOR(opcode)       (((opcode) & 0xFC00) == 0x2400)
+#define SL_AVR_EMU_IS_IN_OUT(opcode)    (((opcode) & 0xF000) == 0xB000)
 #define SL_AVR_EMU_IS_JMP_CALL(opcode)  (((opcode) & 0xFE0C) == 0x940C)
 
 sl_avr_emu_result_e sl_avr_emu_stack_push_byte(sl_avr_emu_emulation_s * emulation, sl_avr_emu_byte_t byte)
@@ -80,6 +82,57 @@ sl_avr_emu_result_e sl_avr_emu_opcode_unrecognized(sl_avr_emu_emulation_s * emul
 
   return SL_AVR_EMU_RESULT_INVALID_OPCODE;
 }
+sl_avr_emu_result_e sl_avr_emu_opcode_unsupported(sl_avr_emu_emulation_s * emulation)
+{
+  /* Unrecognized OPCODE Handling */
+  fprintf(stderr, "Unsupported OPCODE: 0x%04x. PC Address: 0x%06x\n", emulation->memory.flash[emulation->memory.pc], emulation->memory.pc);
+  if(SL_AVR_EMU_PC_ADDRESS_VALID(emulation->memory.pc + 1))
+  {
+    fprintf(stderr, "Next OPCODE: 0x%04x. PC+1 Address: 0x%06x\n", emulation->memory.flash[emulation->memory.pc+1], emulation->memory.pc+1);
+  }
+
+  return SL_AVR_EMU_RESULT_UNSUPPORTED_OPCODE;
+}
+
+sl_avr_emu_result_e sl_avr_emu_opcode_eor(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+  sl_avr_emu_address_t source      = 0;
+  sl_avr_emu_address_t destination = 0;
+
+  source      = (emulation->memory.flash[emulation->memory.pc] & 0xF) | ((emulation->memory.flash[emulation->memory.pc] >> 9) & 0x1);
+  destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0x1F);
+
+  SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
+
+  emulation->memory.data[destination] ^= emulation->memory.data[source];
+
+  if(0 == emulation->memory.data[destination])
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
+  }
+
+  if( 0 != (emulation->memory.data[destination] & 0x80) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_SIGN_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_SIGN_FLAG);
+  }
+
+  emulation->memory.pc++;
+  SL_AVR_EMU_VERBOSE_LOG(printf("EOR. PC 0x%06x\n", emulation->memory.pc));
+
+  return result;
+}
+
 
 /**
  * @brief Opcodes with 0b00 prefix handling
@@ -96,11 +149,14 @@ sl_avr_emu_result_e sl_avr_emu_opcode_0(sl_avr_emu_emulation_s * emulation)
     emulation->memory.pc++;
     SL_AVR_EMU_VERBOSE_LOG(printf("NOP. PC 0x%06x\n", emulation->memory.pc));
   }
+  else if(SL_AVR_EMU_IS_EOR(emulation->memory.flash[emulation->memory.pc]))
+  {
+    sl_avr_emu_opcode_eor(emulation);
+  }
   else
   {
     /* Unrecognized OPCODE Handling */
-    result = SL_AVR_EMU_RESULT_INVALID_OPCODE;
-    fprintf(stderr, "Unrecognized OPCODE: 0x%04x. PC Address: 0x%06x\n", emulation->memory.flash[emulation->memory.pc], emulation->memory.pc);
+    result = sl_avr_emu_opcode_unrecognized(emulation);
   }
   return result;
 }
@@ -124,11 +180,43 @@ sl_avr_emu_result_e sl_avr_emu_opcode_1(sl_avr_emu_emulation_s * emulation)
   return result;
 }
 
+sl_avr_emu_result_e sl_avr_emu_opcode_in_out(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+
+  sl_avr_emu_address_t io_address  = 0;
+  sl_avr_emu_address_t destination = 0;
+
+  io_address  = (emulation->memory.flash[emulation->memory.pc] & 0xF) | ((emulation->memory.flash[emulation->memory.pc] >> 9) & 0x3);
+  destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0x1F);
+
+  SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
+
+  if(SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 11))
+  {
+    emulation->memory.data[SL_AVR_EMU_IO_TO_DATA_ADDRESS(io_address)] = emulation->memory.data[destination];
+    SL_AVR_EMU_VERBOSE_LOG(printf("OUT. PC 0x%06x\n", emulation->memory.pc));
+  }
+  else {
+    emulation->memory.data[destination] = emulation->memory.data[SL_AVR_EMU_IO_TO_DATA_ADDRESS(io_address)];
+    SL_AVR_EMU_VERBOSE_LOG(printf("IN. PC 0x%06x\n", emulation->memory.pc));
+  }
+
+  emulation->memory.pc++;
+
+  return result;
+}
+
 sl_avr_emu_result_e sl_avr_emu_opcode_jmp_call(sl_avr_emu_emulation_s * emulation)
 {
   sl_avr_emu_extended_address_t pc_prev;
   sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
-  if(SL_AVR_EMU_PC_ADDRESS_VALID(emulation->memory.pc + 1))
+
+  if(SL_AVR_EMU_VERSION_AVRRC == emulation->version)
+  {
+    result = sl_avr_emu_opcode_unsupported(emulation);
+  }
+  else if(SL_AVR_EMU_PC_ADDRESS_VALID(emulation->memory.pc + 1))
   {
     pc_prev = emulation->memory.pc;
     emulation->memory.pc = emulation->memory.flash[pc_prev+1];
@@ -138,7 +226,11 @@ sl_avr_emu_result_e sl_avr_emu_opcode_jmp_call(sl_avr_emu_emulation_s * emulatio
     if(0 != (emulation->memory.flash[emulation->memory.pc] & 0x2))
     {
       result = slf_var_emu_stack_push_pc(emulation, (pc_prev + 2));
-      emulation->op_cycles_remaining = 2;
+      emulation->op_cycles_remaining = (SL_AVR_EMU_VERSION_AVRE == emulation->version)?3:2;
+      if(SL_AVR_EMU_EXTENDED_PC_ADDRESS)
+      {
+        emulation->op_cycles_remaining++;
+      }
       SL_AVR_EMU_VERBOSE_LOG(printf("CALL. PC 0x%06x\n", emulation->memory.pc));
     }
     else
@@ -164,15 +256,18 @@ sl_avr_emu_result_e sl_avr_emu_opcode_2(sl_avr_emu_emulation_s * emulation)
 {
   sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
 
-  if( SL_AVR_EMU_IS_JMP_CALL(emulation->memory.flash[emulation->memory.pc]) )
+  if( SL_AVR_EMU_IS_IN_OUT(emulation->memory.flash[emulation->memory.pc]) )
+  {
+    result = sl_avr_emu_opcode_in_out(emulation);
+  }
+  else if( SL_AVR_EMU_IS_JMP_CALL(emulation->memory.flash[emulation->memory.pc]) )
   {
     result = sl_avr_emu_opcode_jmp_call(emulation);
   }
   else
   {
     /* Unrecognized OPCODE Handling */
-    result = SL_AVR_EMU_RESULT_INVALID_OPCODE;
-    fprintf(stderr, "Unrecognized OPCODE: 0x%04x. PC Address: 0x%06x\n", emulation->memory.flash[emulation->memory.pc], emulation->memory.pc);
+    result = sl_avr_emu_opcode_unrecognized(emulation);
   }
   return result;
 }
@@ -191,8 +286,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_3(sl_avr_emu_emulation_s * emulation)
   else
   {
     /* Unrecognized OPCODE Handling */
-    result = SL_AVR_EMU_RESULT_INVALID_OPCODE;
-    fprintf(stderr, "Unrecognized OPCODE: 0x%04x. PC Address: 0x%06x\n", emulation->memory.flash[emulation->memory.pc], emulation->memory.pc);
+    result = sl_avr_emu_opcode_unrecognized(emulation);
   }
   return result;
 }
@@ -241,8 +335,7 @@ sl_avr_emu_result_e sl_avr_emu_tick(sl_avr_emu_emulation_s * emulation)
     }
     else
     {
-      result = SL_AVR_EMU_RESULT_INVALID_PC;
-      fprintf(stderr, "Invalid PC Address: 0x%06x\n", emulation->memory.pc);
+      result = sl_avr_emu_opcode_unrecognized(emulation);
     }
   }
 

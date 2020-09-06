@@ -26,10 +26,11 @@ typedef enum
   SL_AVR_EMU_RESULT_INVALID_FLASH_ADDRESS = 3,
   SL_AVR_EMU_RESULT_INVALID_PC            = 4,
   SL_AVR_EMU_RESULT_INVALID_OPCODE        = 5,
-  SL_AVR_EMU_RESULT_STACK_OVERFLOW        = 6,
-  SL_AVR_EMU_RESULT_STACK_UNDERFLOW       = 7,
-  SL_AVR_EMU_RESULT_INVALID_FILE_PATH     = 8,
-  SL_AVR_EMU_RESULT_INVALID_FILE_FORMAT   = 9,
+  SL_AVR_EMU_RESULT_UNSUPPORTED_OPCODE    = 6,
+  SL_AVR_EMU_RESULT_STACK_OVERFLOW        = 7,
+  SL_AVR_EMU_RESULT_STACK_UNDERFLOW       = 8,
+  SL_AVR_EMU_RESULT_INVALID_FILE_PATH     = 9,
+  SL_AVR_EMU_RESULT_INVALID_FILE_FORMAT   = 10,
 
 } sl_avr_emu_result_e;
 
@@ -114,14 +115,14 @@ typedef uint32_t sl_avr_emu_num_bytes;
  */
 typedef enum
 {
-  SL_AVR_EMU_SREG_CARRY_FLAG      = 0,
-  SL_AVR_EMU_SREG_ZERO_FLAG       = 1,
-  SL_AVR_EMU_SREG_NEGATIVE_FLAG   = 2,
-  SL_AVR_EMU_SREG_OVERFLOW_FLAG   = 3,
-  SL_AVR_EMU_SREG_SIGN_FLAG       = 4,
-  SL_AVR_EMU_SREG_HALF_CARRY_FLAG = 5,
-  SL_AVR_EMU_SREG_BIT_COPY        = 6,
-  SL_AVR_EMU_SREG_INTERRUPT_FLAG  = 7,
+  SL_AVR_EMU_SREG_CARRY_FLAG      = 0, //C
+  SL_AVR_EMU_SREG_ZERO_FLAG       = 1, //Z
+  SL_AVR_EMU_SREG_NEGATIVE_FLAG   = 2, //N
+  SL_AVR_EMU_SREG_OVERFLOW_FLAG   = 3, //V
+  SL_AVR_EMU_SREG_SIGN_FLAG       = 4, //S
+  SL_AVR_EMU_SREG_HALF_CARRY_FLAG = 5, //H
+  SL_AVR_EMU_SREG_BIT_COPY        = 6, //T
+  SL_AVR_EMU_SREG_INTERRUPT_FLAG  = 7, //I
 } sl_avr_emu_sreg_bit_e;
 
 /**
@@ -170,6 +171,17 @@ typedef enum
  */
 #define SL_AVR_EMU_RAMPD_ADDRESS 0x58
 
+/**
+ * @brief Converts IO address to Data address space
+ * 
+ */
+#define SL_AVR_EMU_IO_TO_DATA_ADDRESS(io_address) ((io_address) + SL_AVR_EMU_IO_ADDRESS_SPACE_OFFSET)
+/**
+ * @brief Converts Data address to IO address space
+ * 
+ */
+#define SL_AVR_EMU_DATA_TO_IO_ADDRESS(io_address) ((io_address) + SL_AVR_EMU_IO_ADDRESS_SPACE_OFFSET)
+
 typedef struct
 {
   /* Program Counter */
@@ -189,18 +201,33 @@ typedef struct
 typedef uint8_t sl_avr_emu_op_count_t;
 
 /**
+ * @brief AVR Version Enum
+ * 
+ */
+typedef enum
+{
+  SL_AVR_EMU_VERSION_AVRE,
+  SL_AVR_EMU_VERSION_AVRXM,
+  SL_AVR_EMU_VERSION_AVRXT,
+  SL_AVR_EMU_VERSION_AVRRC,
+} sl_avr_emu_version_e;
+
+/**
  * @brief Main structure for an emulation
  * 
  */
 typedef struct
 {
+  /* AVR Instruction Set Version */
+  sl_avr_emu_version_e  version;
+  
   /* Emulation Memory */
   sl_avr_emu_memory_s   memory;
 
   /* Cycles remaining for current operation.  
      Process as new op on tick if 0, else decrements 1 on tick */
   sl_avr_emu_op_count_t op_cycles_remaining;
-  
+
 } sl_avr_emu_emulation_s;
 
 #endif //_SL_AVR_EMU_TYPES_HPP_
