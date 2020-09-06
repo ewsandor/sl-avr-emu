@@ -24,6 +24,7 @@
 #define SL_AVR_EMU_IS_PUSH_POP(opcode)   (((opcode) & 0xFC0F) == 0x900F)
 #define SL_AVR_EMU_IS_LD_ST(opcode)      ((((opcode) & 0xFC0C) == 0x900C) && !SL_AVR_EMU_IS_PUSH_POP(opcode))
 #define SL_AVR_EMU_IS_LDI(opcode)        (((opcode) & 0xF000) == 0xE000)
+#define SL_AVR_EMU_IS_ORI(opcode)        (((opcode) & 0xF000) == 0x6000)
 #define SL_AVR_EMU_IS_RJMP_RCALL(opcode) (((opcode) & 0xE000) == 0xC000)
 #define SL_AVR_EMU_IS_SEX_CLX(opcode)    (((opcode) & 0xFF0F) == 0x9408)
 
@@ -376,6 +377,46 @@ sl_avr_emu_result_e sl_avr_emu_opcode_0(sl_avr_emu_emulation_s * emulation)
   }
   return result;
 }
+
+sl_avr_emu_result_e sl_avr_emu_opcode_ori(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+  sl_avr_emu_address_t destination = 0;
+  sl_avr_emu_byte_t    k_data      = 0;
+
+  k_data      = (emulation->memory.flash[emulation->memory.pc] & 0xF) | ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0xF0);
+  destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0xF) | 0x10;
+
+  emulation->memory.data[destination] |= k_data;
+
+  SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
+
+  if(0 == emulation->memory.data[destination])
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
+  }
+
+  if( 0 != (emulation->memory.data[destination] & 0x80) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_SIGN_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_SIGN_FLAG);
+  }
+
+  emulation->memory.pc++;
+  SL_AVR_EMU_VERBOSE_LOG(printf("ORI. PC 0x%06x. sreg 0x%02x dest 0x%02x, R_data 0x%02x, k_data 0x%02x\n", emulation->memory.pc, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS], destination, emulation->memory.data[destination], k_data));
+
+  return result;
+}
+
 /**
  * @brief Opcodes with 0b01 prefix handling
  * 
@@ -385,8 +426,9 @@ sl_avr_emu_result_e sl_avr_emu_opcode_0(sl_avr_emu_emulation_s * emulation)
 sl_avr_emu_result_e sl_avr_emu_opcode_1(sl_avr_emu_emulation_s * emulation)
 {
   sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
-  if(0)
+  if(SL_AVR_EMU_IS_ORI(emulation->memory.flash[emulation->memory.pc]))
   {
+    sl_avr_emu_opcode_ori(emulation);
   }
   else
   {
