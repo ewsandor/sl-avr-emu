@@ -157,15 +157,45 @@ typedef enum
  */
 #define SL_AVR_EMU_EIND_ADDRESS 0x5C
 /**
+ * @brief XL pointer address
+ * 
+ */
+#define SL_AVR_EMU_XL_ADDRESS 0x1A
+/**
+ * @brief XH pointer address
+ * 
+ */
+#define SL_AVR_EMU_XH_ADDRESS 0x1B
+/**
  * @brief RAM Prepend to X pointer address
  * 
  */
 #define SL_AVR_EMU_RAMPX_ADDRESS 0x59
 /**
+ * @brief YL pointer address
+ * 
+ */
+#define SL_AVR_EMU_YL_ADDRESS 0x1C
+/**
+ * @brief YH pointer address
+ * 
+ */
+#define SL_AVR_EMU_YH_ADDRESS 0x1D
+/**
  * @brief RAM Prepend to Y pointer address
  * 
  */
 #define SL_AVR_EMU_RAMPY_ADDRESS 0x5A
+/**
+ * @brief ZL pointer address
+ * 
+ */
+#define SL_AVR_EMU_ZL_ADDRESS 0x1E
+/**
+ * @brief ZH pointer address
+ * 
+ */
+#define SL_AVR_EMU_ZH_ADDRESS 0x1F
 /**
  * @brief RAM Prepend to Z pointer address
  * 
