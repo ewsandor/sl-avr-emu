@@ -234,8 +234,8 @@ sl_avr_emu_result_e sl_avr_emu_opcode_cpi(sl_avr_emu_emulation_s * emulation)
   k_data      = (emulation->memory.flash[emulation->memory.pc] & 0xF) | ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0xF0);
   destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0xF) | 0x10;
 
-  compare = emulation->memory.flash[emulation->memory.pc] - k_data;
   d_data = emulation->memory.data[destination];
+  compare = d_data - k_data;
 
   if( (!SL_AVR_EMU_CHECK_BIT(d_data, 3)  && SL_AVR_EMU_CHECK_BIT(k_data, 3))  ||
        (SL_AVR_EMU_CHECK_BIT(compare, 3) && SL_AVR_EMU_CHECK_BIT(k_data, 3)) ||
