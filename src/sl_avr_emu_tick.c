@@ -493,12 +493,12 @@ sl_avr_emu_result_e sl_avr_emu_opcode_ld_st(sl_avr_emu_emulation_s * emulation)
       if(store)
       {
         emulation->memory.data[x_address] = emulation->memory.data[destination];
-        SL_AVR_EMU_VERBOSE_LOG(printf("ST. PC 0x%06x. x 0x%012x, data 0x%04x\n", emulation->memory.pc, x_address, emulation->memory.data[destination]));
+        SL_AVR_EMU_VERBOSE_LOG(printf("ST. PC 0x%06x. x 0x%06x, data 0x%04x\n", emulation->memory.pc, x_address, emulation->memory.data[destination]));
       }
       else 
       {
         emulation->memory.data[destination] = emulation->memory.data[x_address];
-        SL_AVR_EMU_VERBOSE_LOG(printf("LD. PC 0x%06x. x 0x%012x, data 0x%04x\n", emulation->memory.pc, x_address, emulation->memory.data[destination]));
+        SL_AVR_EMU_VERBOSE_LOG(printf("LD. PC 0x%06x. x 0x%06x, data 0x%04x\n", emulation->memory.pc, x_address, emulation->memory.data[destination]));
       }
 
       if(inc)
