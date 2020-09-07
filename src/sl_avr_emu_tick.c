@@ -14,6 +14,7 @@
 #include "sl_avr_emu.h"
 #include "sl_avr_emu_bitops.h"
 #include "sl_avr_emu_tick.h"
+#include "sl_avr_emu_timer.h"
 
 #define SL_AVR_EMU_IS_ADD(opcode)        (((opcode) & 0xEC00) == 0x0C00)
 #define SL_AVR_EMU_IS_AND(opcode)        (((opcode) & 0xFC00) == 0x2000)
@@ -1722,4 +1723,17 @@ sl_avr_emu_result_e sl_avr_emu_tick(sl_avr_emu_emulation_s * emulation)
   }
 
   return result;
+}
+
+/**
+ * @brief Simulates a IO clock tick for a given emulation
+ * 
+ * @param emulation - Pointer to emulation to simulate
+ * @return sl_avr_emu_result_e
+ */
+sl_avr_emu_result_e sl_avr_emu_io_tick(sl_avr_emu_emulation_s * emulation)
+{
+  emulation->io_tick_count++;
+  SL_AVR_EMU_VERBOSE_LOG(printf("IO tick %lu\n", emulation->io_tick_count));
+  sl_avr_emu_timer_8_tick(&emulation->timer0);
 }

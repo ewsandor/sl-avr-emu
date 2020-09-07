@@ -9,8 +9,8 @@
  * 
  */
 
-#ifndef _SL_AVR_EMU_TYPES_HPP_
-#define _SL_AVR_EMU_TYPES_HPP_
+#ifndef _SL_AVR_EMU_TYPES_H_
+#define _SL_AVR_EMU_TYPES_H_
 
 #include <stdint.h>
 
@@ -31,6 +31,7 @@ typedef enum
   SL_AVR_EMU_RESULT_STACK_UNDERFLOW       = 8,
   SL_AVR_EMU_RESULT_INVALID_FILE_PATH     = 9,
   SL_AVR_EMU_RESULT_INVALID_FILE_FORMAT   = 10,
+  SL_AVR_EMU_RESULT_INVALID_HARDWARE      = 11,
 
 } sl_avr_emu_result_e;
 
@@ -230,6 +231,46 @@ typedef struct
 
 } sl_avr_emu_memory_s;
 
+typedef enum
+{
+  SL_AVR_EMU_CLOCK_SELECT_NONE,
+  SL_AVR_EMU_CLOCK_SELECT_IO,
+  SL_AVR_EMU_CLOCK_SELECT_IO_8,
+  SL_AVR_EMU_CLOCK_SELECT_IO_64,
+  SL_AVR_EMU_CLOCK_SELECT_IO_256,
+  SL_AVR_EMU_CLOCK_SELECT_IO_1024,
+  SL_AVR_EMU_CLOCK_SELECT_T0_FALLING,
+  SL_AVR_EMU_CLOCK_SELECT_T0_RISING,
+
+} sl_avr_emu_timer_clock_select_e;
+
+typedef uint16_t sl_avr_emu_timer_prescaler_count_t;
+
+/**
+ * @brief Data for an 8-bit Timer/Counter
+ * 
+ */
+typedef struct
+{
+  /* Timer counter control register A */
+  sl_avr_emu_byte_t *tccra;
+  /* Timer counter control register B */
+  sl_avr_emu_byte_t *tccrb;
+  /* Timer counter register */
+  sl_avr_emu_byte_t *tcnt;
+  /* Output compare register A */
+  sl_avr_emu_byte_t *ocra;
+  /* Output compare register B */
+  sl_avr_emu_byte_t *ocrb;
+  /* Timer counter interrupt mask register */
+  sl_avr_emu_byte_t *timsk;
+  /* Timer counter interrupt flag register */
+  sl_avr_emu_byte_t *tifr;
+
+  sl_avr_emu_timer_prescaler_count_t prescaler_count;
+
+} sl_avr_emu_timer_8_s;
+
 /**
  * @brief Number of cycles related to an operation
  * 
@@ -272,7 +313,12 @@ typedef struct
 
   /* Number of ticks emulated */
   sl_avr_emu_tick_count_t tick_count;
+  /* Number of IO ticks emulated */
+  sl_avr_emu_tick_count_t io_tick_count;
+
+  /* Timer Counter 0 */
+  sl_avr_emu_timer_8_s timer0;
 
 } sl_avr_emu_emulation_s;
 
-#endif //_SL_AVR_EMU_TYPES_HPP_
+#endif //_SL_AVR_EMU_TYPES_H_

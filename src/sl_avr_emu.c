@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "sl_avr_emu.h"
+#include "sl_avr_emu_timer.h"
 #include "sl_avr_emu_hex.h"
 
 /* Global flag to enable/disable verbose logging */
@@ -25,6 +26,9 @@ sl_avr_emu_result_e sl_avr_emu_init(sl_avr_emu_emulation_s *emulation)
   sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
 
   memset(emulation, 0, sizeof(sl_avr_emu_emulation_s));
+
+  printf("Initializing Timer 0\n");
+  result = sl_avr_emu_configure_timer0(&emulation->memory, &emulation->timer0);
 
   return result;
 }
@@ -50,13 +54,20 @@ int main(int argc, char *argv[])
     }
   }
 
-  while(1)
+  while(SL_AVR_EMU_RESULT_SUCCESS == result)
   {
-    result = sl_avr_emu_tick(&emulation);
+    result = sl_avr_emu_io_tick(&emulation);
     if(result != SL_AVR_EMU_RESULT_SUCCESS)
     {
-      fprintf(stderr, "Error! Tick result %u\n", result);
-      break;
+      fprintf(stderr, "Error! IO Tick result %u\n", result);
+    }
+    else
+    {
+      result = sl_avr_emu_tick(&emulation);
+      if(result != SL_AVR_EMU_RESULT_SUCCESS)
+      {
+        fprintf(stderr, "Error! Tick result %u\n", result);
+      }
     }
   }
 
