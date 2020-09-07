@@ -52,7 +52,7 @@ sl_avr_emu_extended_address_t sl_avr_emu_get_x_address(sl_avr_emu_emulation_s * 
 {
   sl_avr_emu_extended_address_t result = 0;
 
-  result = emulation->memory.data[SL_AVR_EMU_XL_ADDRESS] | emulation->memory.data[SL_AVR_EMU_XH_ADDRESS] << 8;
+  result = emulation->memory.data[SL_AVR_EMU_XL_ADDRESS] | (emulation->memory.data[SL_AVR_EMU_XH_ADDRESS] << 8);
 
   if(SL_AVR_EMU_EXTENDED_DATA_ADDRESS)
   {
@@ -80,7 +80,7 @@ sl_avr_emu_extended_address_t sl_avr_emu_get_z_address(sl_avr_emu_emulation_s * 
 {
   sl_avr_emu_extended_address_t result = 0;
 
-  result = emulation->memory.data[SL_AVR_EMU_ZL_ADDRESS] | emulation->memory.data[SL_AVR_EMU_ZH_ADDRESS] << 8;
+  result = emulation->memory.data[SL_AVR_EMU_ZL_ADDRESS] | (emulation->memory.data[SL_AVR_EMU_ZH_ADDRESS] << 8);
   if(extended)
   {
     result |= emulation->memory.data[SL_AVR_EMU_RAMPZ_ADDRESS] << 16;
@@ -96,7 +96,7 @@ sl_avr_emu_result_e sl_avr_emu_set_z_address(sl_avr_emu_emulation_s * emulation,
   emulation->memory.data[SL_AVR_EMU_ZH_ADDRESS] = (address >> 8) & 0xFF;
   if(extended)
   {
-    emulation->memory.data[SL_AVR_EMU_RAMPX_ADDRESS] = (address >> 16) & 0xFF;
+    emulation->memory.data[SL_AVR_EMU_RAMPZ_ADDRESS] = (address >> 16) & 0xFF;
   }
 
   return result;
@@ -471,14 +471,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_cp_cpc(sl_avr_emu_emulation_s * emulation)
 
   emulation->memory.pc++;
 
-  if(with_carry)
-  {
-    SL_AVR_EMU_VERBOSE_LOG(printf("CPC. PC 0x%06x. sreg 0x%04x, d_data 0x%04x, r_data 0x%02x\n", emulation->memory.pc, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS], d_data, r_data));
-  }
-  else 
-  {
-    SL_AVR_EMU_VERBOSE_LOG(printf("CP. PC 0x%06x. sreg 0x%04x, d_data 0x%04x, r_data 0x%02x\n", emulation->memory.pc, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS], d_data, r_data));
-  }
+  SL_AVR_EMU_VERBOSE_LOG(printf("%s. PC 0x%06x. sreg 0x%02x, source 0x%02x, dest 0x%02x, r_data 0x%02x, d_data 0x%02x, compare 0x%02x\n", (with_carry)?"CPC":"CP", emulation->memory.pc, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS], source, destination, r_data, d_data, compare));
 
   return result;
 }
@@ -556,7 +549,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_cpi(sl_avr_emu_emulation_s * emulation)
   }
 
   emulation->memory.pc++;
-  SL_AVR_EMU_VERBOSE_LOG(printf("CPI. PC 0x%06x. sreg 0x%02x, data 0x%02x, k_data 0x%02x, compare 0x%02x\n", emulation->memory.pc, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS], emulation->memory.data[destination], k_data, compare));
+  SL_AVR_EMU_VERBOSE_LOG(printf("CPI. PC 0x%06x. sreg 0x%02x, dest 0x%02x data 0x%02x, k_data 0x%02x, compare 0x%02x\n", emulation->memory.pc, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS], destination, emulation->memory.data[destination], k_data, compare));
 
   return result;
 }
@@ -831,7 +824,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_sub(sl_avr_emu_emulation_s * emulation)
 
   source      = (emulation->memory.flash[emulation->memory.pc] & 0xF) | ((emulation->memory.flash[emulation->memory.pc] >> 5) & 0x10);
   destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0x1F);
-  with_carry  = SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 12);
+  with_carry  = !SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 12);
 
   r_data = emulation->memory.data[source];
   d_data = emulation->memory.data[destination];
@@ -905,7 +898,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_sub(sl_avr_emu_emulation_s * emulation)
   }
 
   emulation->memory.pc++;
-  SL_AVR_EMU_VERBOSE_LOG(printf("%s. PC 0x%06x. dest 0x%04x, d_data 0x%02x, r_data 0x%02x, difference 0x%02x, sreg 0x%02x\n", (with_carry)?"SBC":"SUB", emulation->memory.pc, destination, d_data, r_data, difference, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS]));
+  SL_AVR_EMU_VERBOSE_LOG(printf("%s. PC 0x%06x. dest 0x%02x, source 0x%02x, d_data 0x%02x, r_data 0x%02x, difference 0x%02x, sreg 0x%02x\n", (with_carry)?"SBC":"SUB", emulation->memory.pc, destination, source, d_data, r_data, difference, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS]));
 
   return result;
 }
@@ -1390,7 +1383,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_lpm_elpm(sl_avr_emu_emulation_s * emulatio
   }
 
   emulation->memory.pc++;
-  SL_AVR_EMU_VERBOSE_LOG(printf("%s. PC 0x%06x. z_address 0x%06x, dest 0x%02x, r_data 0x%02x\n", (extended)?"ELPM":"LPM", emulation->memory.pc, z_pointer, destination, emulation->memory.data[destination]));
+  SL_AVR_EMU_VERBOSE_LOG(printf("%s. PC 0x%06x. z_address 0x%06x, dest 0x%02x, d_data 0x%02x, inc %u\n", (extended)?"ELPM":"LPM", emulation->memory.pc, z_pointer, destination, emulation->memory.data[destination], inc));
 
   return result;
 }
