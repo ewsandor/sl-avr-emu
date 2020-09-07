@@ -335,7 +335,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_add(sl_avr_emu_emulation_s * emulation)
   }
 
   emulation->memory.pc++;
-  SL_AVR_EMU_VERBOSE_LOG(printf("%s. PC 0x%06x. dest 0x%04x, r_data 0x%02x, d_data 0x%02x, sum 0x%02x, sreg 0x%02x\n", (with_carry)?"ADC":"ADD", emulation->memory.pc, destination, r_data, d_data, sum, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS]));
+  SL_AVR_EMU_VERBOSE_LOG(printf("%s. PC 0x%06x. source 0x%02x, dest 0x%02x, r_data 0x%02x, d_data 0x%02x, sum 0x%02x, sreg 0x%02x\n", (with_carry)?"ADC":"ADD", emulation->memory.pc, source, destination, r_data, d_data, sum, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS]));
 
   return result;
 }
@@ -547,7 +547,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_cpi(sl_avr_emu_emulation_s * emulation)
   }
 
   emulation->memory.pc++;
-  SL_AVR_EMU_VERBOSE_LOG(printf("CPI. PC 0x%06x. sreg 0x%04x, data 0x%04x, k_data 0x%02x\n", emulation->memory.pc, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS], emulation->memory.data[destination], k_data));
+  SL_AVR_EMU_VERBOSE_LOG(printf("CPI. PC 0x%06x. sreg 0x%02x, data 0x%02x, k_data 0x%02x, compare 0x%02x\n", emulation->memory.pc, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS], emulation->memory.data[destination], k_data, compare));
 
   return result;
 }
@@ -632,7 +632,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_eor(sl_avr_emu_emulation_s * emulation)
   }
 
   emulation->memory.pc++;
-  SL_AVR_EMU_VERBOSE_LOG(printf("EOR. PC 0x%06x. dest 0x%04x, data 0x%04x\n", emulation->memory.pc, destination, emulation->memory.data[destination]));
+  SL_AVR_EMU_VERBOSE_LOG(printf("EOR. PC 0x%06x. source 0x%04x dest 0x%04x, data 0x%04x\n", emulation->memory.pc, source, destination, emulation->memory.data[destination]));
 
   return result;
 }
@@ -652,7 +652,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_mov(sl_avr_emu_emulation_s * emulation)
     source      = (emulation->memory.flash[emulation->memory.pc] & 0xF) | ((emulation->memory.flash[emulation->memory.pc] >> 5) & 0x10);
     destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0x1F);
 
-    emulation->memory.data[destination]   = emulation->memory.data[source];
+    emulation->memory.data[destination] = emulation->memory.data[source];
 
     emulation->memory.pc++;
     SL_AVR_EMU_VERBOSE_LOG(printf("MOV. PC 0x%06x. source 0x%04x, dest 0x%04x, data 0x%02x\n", emulation->memory.pc, source, destination, emulation->memory.data[destination]));
@@ -680,7 +680,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_movw(sl_avr_emu_emulation_s * emulation)
     emulation->memory.data[destination+1] = emulation->memory.data[source+1];
 
     emulation->memory.pc++;
-    SL_AVR_EMU_VERBOSE_LOG(printf("MOVW. PC 0x%06x. source 0x%04x, dest 0x%04x, data 0x%02x%02x\n", emulation->memory.pc, source, destination, emulation->memory.data[destination+1], emulation->memory.data[destination]));
+    SL_AVR_EMU_VERBOSE_LOG(printf("MOVW. PC 0x%06x. source 0x%02x, dest 0x%02x, data 0x%02x%02x\n", emulation->memory.pc, source, destination, emulation->memory.data[destination+1], emulation->memory.data[destination]));
   }
 
   return result;
@@ -1040,6 +1040,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_adiw(sl_avr_emu_emulation_s * emulation)
   destination = (destination<<2) + 24;
 
   d_data = emulation->memory.data[destination] | emulation->memory.data[destination+1]<<8;
+
   sum = k_data+d_data;
 
   emulation->memory.data[destination]   = sum & 0xFF;
@@ -1091,7 +1092,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_adiw(sl_avr_emu_emulation_s * emulation)
   }
 
   emulation->memory.pc++;
-  SL_AVR_EMU_VERBOSE_LOG(printf("ADIW. PC 0x%06x. dest 0x%04x, k_data 0x%02x, d_data 0x%02x, sum 0x%02x, sreg 0x%02x\n", emulation->memory.pc, destination, k_data, d_data, sum, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS]));
+  SL_AVR_EMU_VERBOSE_LOG(printf("ADIW. PC 0x%06x. dest 0x%04x, k_data 0x%02x, d_data 0x%04x, sum 0x%04x, sreg 0x%02x\n", emulation->memory.pc, destination, k_data, d_data, sum, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS]));
 
   return result;
 }
@@ -1417,7 +1418,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_push_pop(sl_avr_emu_emulation_s * emulatio
   }
 
   emulation->memory.pc++;
-  SL_AVR_EMU_VERBOSE_LOG(printf("%s. PC 0x%06x. d_data 0x%02x\n", (push)?"PUSH":"POP", emulation->memory.pc, emulation->memory.data[destination]));
+  SL_AVR_EMU_VERBOSE_LOG(printf("%s. PC 0x%06x. dest 0x%02d, d_data 0x%02x\n", (push)?"PUSH":"POP", emulation->memory.pc, destination, emulation->memory.data[destination]));
 
   return result;
 }
@@ -1656,14 +1657,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_brbs_brbc(sl_avr_emu_emulation_s * emulati
     emulation->memory.pc++;
   }
 
-  if(check_set)
-  {
-    SL_AVR_EMU_VERBOSE_LOG(printf("BRBS. PC 0x%06x. sreg 0x%04x, check %d, relative_pc 0x%x\n", emulation->memory.pc, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS], check, pc_relative));
-  }
-  else 
-  {
-    SL_AVR_EMU_VERBOSE_LOG(printf("BRBC. PC 0x%06x. sreg 0x%04x, check %d, relative_pc 0x%x\n", emulation->memory.pc, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS], check, pc_relative));
-  }
+  SL_AVR_EMU_VERBOSE_LOG(printf("%s. PC 0x%06x. sreg 0x%02x, check %d, bit %u, relative_pc 0x%x\n", (check_set)?"BRBS":"BRBC", emulation->memory.pc, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS], check, check_bit, pc_relative));
 
   return result;
 }

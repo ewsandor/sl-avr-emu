@@ -5,3 +5,4 @@ sl_avr_emu
 *.gch
 *.hex
 *.code-workspace
+*.swp
