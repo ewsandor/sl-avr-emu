@@ -20,6 +20,7 @@
 #define SL_AVR_EMU_IS_BRBS_BRBC(opcode)  (((opcode) & 0xF800) == 0xF000)
 #define SL_AVR_EMU_IS_CP_CPC(opcode)     (((opcode) & 0xEC00) == 0x0400)
 #define SL_AVR_EMU_IS_CPI(opcode)        (((opcode) & 0xF000) == 0x3000)
+#define SL_AVR_EMU_IS_CPSE(opcode)       (((opcode) & 0xFC00) == 0x1000)
 #define SL_AVR_EMU_IS_EOR(opcode)        (((opcode) & 0xFC00) == 0x2400)
 #define SL_AVR_EMU_IS_IN_OUT(opcode)     (((opcode) & 0xF000) == 0xB000)
 #define SL_AVR_EMU_IS_JMP_CALL(opcode)   (((opcode) & 0xFE0C) == 0x940C)
@@ -35,6 +36,8 @@
 #define SL_AVR_EMU_IS_RJMP_RCALL(opcode) (((opcode) & 0xE000) == 0xC000)
 #define SL_AVR_EMU_IS_SEX_CLX(opcode)    (((opcode) & 0xFF0F) == 0x9408)
 #define SL_AVR_EMU_IS_SUBI_SBCI(opcode)  (((opcode) & 0xE000) == 0x4000)
+
+#define SL_AVR_EMU_IS_TWO_WORD_OPCODE(opcode) (SL_AVR_EMU_IS_JMP_CALL(opcode) || SL_AVR_EMU_IS_LDS_STS(opcode))
 
 sl_avr_emu_extended_address_t sl_avr_emu_get_x_address(sl_avr_emu_emulation_s * emulation)
 {
@@ -465,6 +468,52 @@ sl_avr_emu_result_e sl_avr_emu_opcode_cpi(sl_avr_emu_emulation_s * emulation)
   return result;
 }
 
+sl_avr_emu_result_e sl_avr_emu_opcode_cpse(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_result_e  result = SL_AVR_EMU_RESULT_SUCCESS;
+  sl_avr_emu_address_t source      = 0;
+  sl_avr_emu_address_t destination = 0;
+
+  source      = (emulation->memory.flash[emulation->memory.pc] & 0xF) | ((emulation->memory.flash[emulation->memory.pc] >> 5) & 0x10);
+  destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0x1F);
+
+  if(emulation->memory.data[source] == emulation->memory.data[destination])
+  {
+    if(SL_AVR_EMU_PC_ADDRESS_VALID(emulation->memory.pc+1))
+    {
+      if(SL_AVR_EMU_IS_TWO_WORD_OPCODE(emulation->memory.flash[emulation->memory.pc+1]))
+      {
+        if(SL_AVR_EMU_VERSION_AVRRC == emulation->version)
+        {
+          result = sl_avr_emu_opcode_unsupported(emulation);
+        }
+        else
+        {
+          emulation->memory.pc += 3;
+          emulation->op_cycles_remaining = 2;
+        }
+      }
+      else 
+      {
+        emulation->memory.pc += 2;
+        emulation->op_cycles_remaining = 1;
+      }
+    }
+    else 
+    {
+      result = SL_AVR_EMU_RESULT_INVALID_PC;
+    }
+  }
+  else 
+  {
+    emulation->memory.pc++;
+  }
+
+  SL_AVR_EMU_VERBOSE_LOG(printf("CPSE. PC 0x%06x. r_data 0x%02x, d_data 0x%02x\n", emulation->memory.pc, emulation->memory.data[source], emulation->memory.data[destination]));
+
+  return result;
+}
+
 sl_avr_emu_result_e sl_avr_emu_opcode_eor(sl_avr_emu_emulation_s * emulation)
 {
   sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
@@ -686,6 +735,10 @@ sl_avr_emu_result_e sl_avr_emu_opcode_0(sl_avr_emu_emulation_s * emulation)
   else if(SL_AVR_EMU_IS_CPI(emulation->memory.flash[emulation->memory.pc]))
   {
     sl_avr_emu_opcode_cpi(emulation);
+  }
+  else if(SL_AVR_EMU_IS_CPSE(emulation->memory.flash[emulation->memory.pc]))
+  {
+    sl_avr_emu_opcode_cpse(emulation);
   }
   else if(SL_AVR_EMU_IS_EOR(emulation->memory.flash[emulation->memory.pc]))
   {
