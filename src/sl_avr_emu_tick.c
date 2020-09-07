@@ -641,7 +641,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_eor(sl_avr_emu_emulation_s * emulation)
   }
 
   emulation->memory.pc++;
-  SL_AVR_EMU_VERBOSE_LOG(printf("EOR. PC 0x%06x. source 0x%04x dest 0x%04x, data 0x%04x\n", emulation->memory.pc, source, destination, emulation->memory.data[destination]));
+  SL_AVR_EMU_VERBOSE_LOG(printf("EOR. PC 0x%06x. source 0x%02x dest 0x%02x, data 0x%02x\n", emulation->memory.pc, source, destination, emulation->memory.data[destination]));
 
   return result;
 }
@@ -816,7 +816,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_or(sl_avr_emu_emulation_s * emulation)
   }
 
   emulation->memory.pc++;
-  SL_AVR_EMU_VERBOSE_LOG(printf("OR. PC 0x%06x. dest 0x%04x, data 0x%04x\n", emulation->memory.pc, destination, emulation->memory.data[destination]));
+  SL_AVR_EMU_VERBOSE_LOG(printf("OR. PC 0x%06x. source 0x%02x, dest 0x%02x, data 0x%02x\n", emulation->memory.pc, source, destination, emulation->memory.data[destination]));
 
   return result;
 }
@@ -1261,12 +1261,12 @@ sl_avr_emu_result_e sl_avr_emu_opcode_ld_st(sl_avr_emu_emulation_s * emulation)
       if(store)
       {
         emulation->memory.data[x_address] = emulation->memory.data[destination];
-        SL_AVR_EMU_VERBOSE_LOG(printf("ST. PC 0x%06x. x 0x%06x, data 0x%04x\n", emulation->memory.pc, x_address, emulation->memory.data[destination]));
+        SL_AVR_EMU_VERBOSE_LOG(printf("ST. PC 0x%06x. x 0x%06x, data 0x%02x\n", emulation->memory.pc, x_address, emulation->memory.data[destination]));
       }
       else 
       {
         emulation->memory.data[destination] = emulation->memory.data[x_address];
-        SL_AVR_EMU_VERBOSE_LOG(printf("LD. PC 0x%06x. x 0x%06x, data 0x%04x\n", emulation->memory.pc, x_address, emulation->memory.data[destination]));
+        SL_AVR_EMU_VERBOSE_LOG(printf("LD. PC 0x%06x. x 0x%06x, data 0x%02x\n", emulation->memory.pc, x_address, emulation->memory.data[destination]));
       }
 
       if(inc)
@@ -1667,7 +1667,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_ldi(sl_avr_emu_emulation_s * emulation)
 
   emulation->memory.pc++;
   emulation->memory.data[destination] = k_data;
-  SL_AVR_EMU_VERBOSE_LOG(printf("LDI. PC 0x%06x. dest 0x%04x, data 0x%04x\n", emulation->memory.pc, destination, k_data));
+  SL_AVR_EMU_VERBOSE_LOG(printf("LDI. PC 0x%06x. dest 0x%02x, data 0x%02x\n", emulation->memory.pc, destination, k_data));
 
   return result;
 }
