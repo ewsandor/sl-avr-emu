@@ -21,6 +21,7 @@
 #define SL_AVR_EMU_IS_ADIW(opcode)       (((opcode) & 0xFF00) == 0x9600)
 #define SL_AVR_EMU_IS_AND(opcode)        (((opcode) & 0xFC00) == 0x2000)
 #define SL_AVR_EMU_IS_BRBS_BRBC(opcode)  (((opcode) & 0xF800) == 0xF000)
+#define SL_AVR_EMU_IS_COM(opcode)        (((opcode) & 0xFE0C) == 0x9400)
 #define SL_AVR_EMU_IS_CP_CPC(opcode)     (((opcode) & 0xEC00) == 0x0400)
 #define SL_AVR_EMU_IS_CPI(opcode)        (((opcode) & 0xF000) == 0x3000)
 #define SL_AVR_EMU_IS_CPSE(opcode)       (((opcode) & 0xFC00) == 0x1000)
@@ -1388,6 +1389,46 @@ sl_avr_emu_result_e sl_avr_emu_opcode_lpm_elpm(sl_avr_emu_emulation_s * emulatio
   return result;
 }
 
+sl_avr_emu_result_e sl_avr_emu_opcode_com(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+  sl_avr_emu_address_t destination = 0;
+  sl_avr_emu_byte_t    d_data      = 0;
+
+  destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0x1F);
+
+  d_data = emulation->memory.data[destination];
+  emulation->memory.data[destination] = ~d_data;
+
+  SL_AVR_EMU_SET_SREG_BIT  (*emulation, SL_AVR_EMU_SREG_CARRY_FLAG);
+  SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
+
+  if(0 == emulation->memory.data[destination])
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
+  }
+
+  if( 0 != (emulation->memory.data[destination] & 0x80) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_SIGN_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_SIGN_FLAG);
+  }
+
+  emulation->memory.pc++;
+  SL_AVR_EMU_VERBOSE_LOG(printf("COM. PC 0x%06x. sreg 0x%02x dest 0x%02x, R_data 0%02x, d_data 0x%02x\n", emulation->memory.pc, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS], destination, emulation->memory.data[destination], d_data));
+
+  return result;
+}
+
 sl_avr_emu_result_e sl_avr_emu_opcode_push_pop(sl_avr_emu_emulation_s * emulation)
 {
   sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
@@ -1617,6 +1658,10 @@ sl_avr_emu_result_e sl_avr_emu_opcode_2(sl_avr_emu_emulation_s * emulation)
           SL_AVR_EMU_IS_LPMZ_ELPMZ(emulation->memory.flash[emulation->memory.pc]))
   {
     result = sl_avr_emu_opcode_lpm_elpm(emulation);
+  }
+  else if(SL_AVR_EMU_IS_COM(emulation->memory.flash[emulation->memory.pc]))
+  {
+    result = sl_avr_emu_opcode_com(emulation);
   }
   else if(SL_AVR_EMU_IS_PUSH_POP(emulation->memory.flash[emulation->memory.pc]))
   {
