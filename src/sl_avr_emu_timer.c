@@ -82,12 +82,14 @@ sl_avr_emu_result_e sl_avr_emu_timer_8_tick(sl_avr_emu_timer_8_s *timer)
 {
   sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
   sl_avr_emu_timer_clock_select_e    clock_select;
+  sl_avr_emu_timer_wgm_e             timer_wgm;
   sl_avr_emu_timer_prescaler_count_t prescaler_reference;
   sl_avr_emu_byte_t                  tcnt_prev;
 
   if(sl_avr_emu_timer_8_configured(timer))
   {
     clock_select = (*timer->tccrb & 0x7);
+    timer_wgm    = (*timer->tccra & 0x3) | ((*timer->tccrb >> 1) & 0x4);
 
     if(SL_AVR_EMU_CLOCK_SELECT_NONE != clock_select)
     {
@@ -139,6 +141,12 @@ sl_avr_emu_result_e sl_avr_emu_timer_8_tick(sl_avr_emu_timer_8_s *timer)
         if(*timer->tcnt == *timer->ocra)
         {
           SL_AVR_EMU_SET_BIT(*timer->tifr, SL_AVR_EMU_TIMER_0_OCF0A);
+          if(SL_AVR_EMU_TIMER_WGM_CTC           == timer_wgm ||
+             SL_AVR_EMU_TIMER_WGM_PWM_OCRA      == timer_wgm ||
+             SL_AVR_EMU_TIMER_WGM_FAST_PWM_OCRA == timer_wgm )
+          {
+            *timer->tcnt = 0;
+          }
         }
         if(*timer->tcnt == *timer->ocrb)
         {

@@ -219,6 +219,10 @@ typedef enum
  */
 #define SL_AVR_EMU_DATA_TO_IO_ADDRESS(io_address) ((io_address) + SL_AVR_EMU_IO_ADDRESS_SPACE_OFFSET)
 
+/**
+ * @brief Emulated device memory
+ * 
+ */
 typedef struct
 {
   /* Program Counter */
@@ -231,6 +235,10 @@ typedef struct
 
 } sl_avr_emu_memory_s;
 
+/**
+ * @brief Enum of timer clock source types
+ * 
+ */
 typedef enum
 {
   SL_AVR_EMU_CLOCK_SELECT_NONE,
@@ -241,8 +249,24 @@ typedef enum
   SL_AVR_EMU_CLOCK_SELECT_IO_1024,
   SL_AVR_EMU_CLOCK_SELECT_T0_FALLING,
   SL_AVR_EMU_CLOCK_SELECT_T0_RISING,
-
 } sl_avr_emu_timer_clock_select_e;
+
+/**
+ * @brief Enum of Waveform Generation Modes
+ * 
+ */
+
+typedef enum
+{
+  SL_AVR_EMU_TIMER_WGM_NORMAL,
+  SL_AVR_EMU_TIMER_WGM_PWM,
+  SL_AVR_EMU_TIMER_WGM_CTC,
+  SL_AVR_EMU_TIMER_WGM_FAST_PWM,
+  SL_AVR_EMU_TIMER_WGM_RESERVED_0,
+  SL_AVR_EMU_TIMER_WGM_PWM_OCRA,
+  SL_AVR_EMU_TIMER_WGM_RESERVED_1,
+  SL_AVR_EMU_TIMER_WGM_FAST_PWM_OCRA, 
+} sl_avr_emu_timer_wgm_e;
 
 typedef uint16_t sl_avr_emu_timer_prescaler_count_t;
 
