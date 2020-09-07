@@ -33,6 +33,7 @@
 #define SL_AVR_EMU_IS_MOVW(opcode)       (((opcode) & 0xFF00) == 0x0100)
 #define SL_AVR_EMU_IS_OR(opcode)         (((opcode) & 0xFC00) == 0x2800)
 #define SL_AVR_EMU_IS_ORI(opcode)        (((opcode) & 0xF000) == 0x6000)
+#define SL_AVR_EMU_IS_RET(opcode)        (((opcode) & 0xFFFF) == 0x9508)
 #define SL_AVR_EMU_IS_RJMP_RCALL(opcode) (((opcode) & 0xE000) == 0xC000)
 #define SL_AVR_EMU_IS_SEX_CLX(opcode)    (((opcode) & 0xFF0F) == 0x9408)
 #define SL_AVR_EMU_IS_SUBI_SBCI(opcode)  (((opcode) & 0xE000) == 0x4000)
@@ -129,6 +130,51 @@ sl_avr_emu_result_e sl_avr_emu_stack_push_byte(sl_avr_emu_emulation_s * emulatio
   return result;
 }
 
+sl_avr_emu_result_e sl_avr_emu_stack_pop_byte(sl_avr_emu_emulation_s * emulation, sl_avr_emu_byte_t *byte)
+{
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+  sl_avr_emu_extended_address_t sp;
+
+  if(byte != NULL)
+  {
+    sp = emulation->memory.data[SL_AVR_EMU_SPL_ADDRESS];
+
+    if(SL_AVR_EMU_EXTENDED_DATA_ADDRESS)
+    {
+      sp |= (emulation->memory.data[SL_AVR_EMU_SPH_ADDRESS] << 8);
+    }
+
+    if(SL_AVR_EMU_DATA_ADDRESS_VALID(sp))
+    {
+      if(sp < SL_AVR_EMU_DATA_SIZE-1)
+      {
+        sp++;
+        emulation->memory.data[SL_AVR_EMU_SPL_ADDRESS] = (sp & 0xFF);
+        if(SL_AVR_EMU_EXTENDED_DATA_ADDRESS)
+        {
+          emulation->memory.data[SL_AVR_EMU_SPH_ADDRESS] = ((sp >> 8) & 0xFF);
+        }
+
+        *byte = emulation->memory.data[sp];
+      }
+      else 
+      {
+        result = SL_AVR_EMU_RESULT_STACK_UNDERFLOW;
+      }
+    }
+    else 
+    {
+      result = SL_AVR_EMU_RESULT_INVALID_DATA_ADDRESS;
+    }
+  }
+  else
+  {
+    result = SL_AVR_EMU_RESULT_FAILURE;
+  }
+
+  return result;
+}
+
 sl_avr_emu_result_e slf_var_emu_stack_push_pc(sl_avr_emu_emulation_s * emulation, sl_avr_emu_extended_address_t pc)
 {
   sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
@@ -141,6 +187,38 @@ sl_avr_emu_result_e slf_var_emu_stack_push_pc(sl_avr_emu_emulation_s * emulation
   if(SL_AVR_EMU_EXTENDED_PC_ADDRESS && SL_AVR_EMU_RESULT_SUCCESS == result)
   {
     result = sl_avr_emu_stack_push_byte(emulation, ((pc >> 16) & 0xFF));
+  }
+  
+  return result;
+}
+
+sl_avr_emu_result_e slf_var_emu_stack_pop_pc(sl_avr_emu_emulation_s * emulation, sl_avr_emu_extended_address_t *pc)
+{
+  sl_avr_emu_byte_t byte;
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+
+  if(pc != NULL)
+  {
+    *pc = 0;
+    if(SL_AVR_EMU_EXTENDED_PC_ADDRESS)
+    {
+      result = sl_avr_emu_stack_pop_byte(emulation, &byte);
+      *pc |= byte << 16;
+    }
+    if(SL_AVR_EMU_RESULT_SUCCESS == result)
+    { 
+      result = sl_avr_emu_stack_pop_byte(emulation, &byte);
+      *pc |= byte << 8;
+    }
+    if(SL_AVR_EMU_RESULT_SUCCESS == result)
+    { 
+      result = sl_avr_emu_stack_pop_byte(emulation, &byte);
+      *pc |= byte;
+    }
+  }
+  else
+  {
+    result = SL_AVR_EMU_RESULT_FAILURE;
   }
   
   return result;
@@ -1056,7 +1134,37 @@ sl_avr_emu_result_e sl_avr_emu_opcode_lpm_elpm(sl_avr_emu_emulation_s * emulatio
   return result;
 }
 
+sl_avr_emu_result_e sl_avr_emu_opcode_ret(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+  
+  result = slf_var_emu_stack_pop_pc(emulation, &emulation->memory.pc);
 
+  if(SL_AVR_EMU_VERSION_AVRRC == emulation->version)
+  {
+    emulation->op_cycles_remaining = 5;
+  }
+  else 
+  {
+    emulation->op_cycles_remaining = 3;
+  }
+
+  if(SL_AVR_EMU_EXTENDED_PC_ADDRESS)
+  { 
+    if(SL_AVR_EMU_VERSION_AVRRC == emulation->version)
+    {
+      result = sl_avr_emu_opcode_unsupported(emulation);
+    }
+    else
+    {
+      emulation->op_cycles_remaining++;
+    }
+  }
+
+  SL_AVR_EMU_VERBOSE_LOG(printf("RET. PC 0x%06x.\n", emulation->memory.pc));
+
+  return result;
+}
 
 sl_avr_emu_result_e sl_avr_emu_opcode_sex_clx(sl_avr_emu_emulation_s * emulation)
 {
@@ -1114,6 +1222,10 @@ sl_avr_emu_result_e sl_avr_emu_opcode_2(sl_avr_emu_emulation_s * emulation)
           SL_AVR_EMU_IS_LPMZ_ELPMZ(emulation->memory.flash[emulation->memory.pc]))
   {
     result = sl_avr_emu_opcode_lpm_elpm(emulation);
+  }
+  else if(SL_AVR_EMU_IS_RET(emulation->memory.flash[emulation->memory.pc]))
+  {
+    result = sl_avr_emu_opcode_ret(emulation);
   }
   else if(SL_AVR_EMU_IS_SEX_CLX(emulation->memory.flash[emulation->memory.pc]))
   {
