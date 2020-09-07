@@ -25,6 +25,8 @@
 #define SL_AVR_EMU_IS_LD_ST(opcode)      ((((opcode) & 0xFC0C) == 0x900C) && !SL_AVR_EMU_IS_PUSH_POP(opcode))
 #define SL_AVR_EMU_IS_LDI(opcode)        (((opcode) & 0xF000) == 0xE000)
 #define SL_AVR_EMU_IS_LDS_STS(opcode)    (((opcode) & 0xFC0F) == 0x9000)
+#define SL_AVR_EMU_IS_LPM_ELPM(opcode)   (((opcode) & 0xFFEF) == 0x95C8)
+#define SL_AVR_EMU_IS_LPMZ_ELPMZ(opcode) (((opcode) & 0xFE0C) == 0x9004)
 #define SL_AVR_EMU_IS_ORI(opcode)        (((opcode) & 0xF000) == 0x6000)
 #define SL_AVR_EMU_IS_RJMP_RCALL(opcode) (((opcode) & 0xE000) == 0xC000)
 #define SL_AVR_EMU_IS_SEX_CLX(opcode)    (((opcode) & 0xFF0F) == 0x9408)
@@ -56,6 +58,33 @@ sl_avr_emu_result_e sl_avr_emu_set_x_address(sl_avr_emu_emulation_s * emulation,
 
   return result;
 }
+
+sl_avr_emu_extended_address_t sl_avr_emu_get_z_address(sl_avr_emu_emulation_s * emulation, bool extended)
+{
+  sl_avr_emu_extended_address_t result = 0;
+
+  result = emulation->memory.data[SL_AVR_EMU_ZL_ADDRESS] | emulation->memory.data[SL_AVR_EMU_ZH_ADDRESS] << 8;
+  if(extended)
+  {
+    result |= emulation->memory.data[SL_AVR_EMU_RAMPZ_ADDRESS] << 16;
+  }
+
+  return result;
+}
+sl_avr_emu_result_e sl_avr_emu_set_z_address(sl_avr_emu_emulation_s * emulation, sl_avr_emu_extended_address_t address, bool extended)
+{
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+
+  emulation->memory.data[SL_AVR_EMU_ZL_ADDRESS] = address & 0xFF;
+  emulation->memory.data[SL_AVR_EMU_ZH_ADDRESS] = (address >> 8) & 0xFF;
+  if(extended)
+  {
+    emulation->memory.data[SL_AVR_EMU_RAMPX_ADDRESS] = (address >> 16) & 0xFF;
+  }
+
+  return result;
+}
+
 
 sl_avr_emu_result_e sl_avr_emu_stack_push_byte(sl_avr_emu_emulation_s * emulation, sl_avr_emu_byte_t byte)
 {
@@ -619,6 +648,59 @@ sl_avr_emu_result_e sl_avr_emu_opcode_lds_sts(sl_avr_emu_emulation_s * emulation
   return result;
 }
 
+sl_avr_emu_result_e sl_avr_emu_opcode_lpm_elpm(sl_avr_emu_emulation_s * emulation)
+{
+  bool extended, inc;
+  sl_avr_emu_extended_address_t destination;
+  sl_avr_emu_extended_address_t z_pointer;
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+
+  if(SL_AVR_EMU_IS_LPM_ELPM(emulation->memory.flash[emulation->memory.pc]))
+  {
+    inc = 0;
+    extended = SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 4);
+    destination = 0x0;
+  }
+  else 
+  {
+    inc      = SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 0);
+    extended = SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 1);
+    destination = (emulation->memory.flash[emulation->memory.pc]>>4) & 0x1F;
+  }
+
+  if(SL_AVR_EMU_VERSION_AVRRC == emulation->version)
+  {
+    result = sl_avr_emu_opcode_unsupported(emulation);
+  }
+  else 
+  {
+    emulation->op_cycles_remaining = 2;
+  }
+
+  z_pointer = sl_avr_emu_get_z_address(emulation, extended);
+
+  if(SL_AVR_EMU_RESULT_SUCCESS == result && SL_AVR_EMU_FLASH_ADDRESS_VALID(z_pointer))
+  {
+    emulation->memory.data[destination] = emulation->memory.flash[z_pointer];
+
+    if(inc)
+    {
+      z_pointer++;
+      result = sl_avr_emu_set_z_address(emulation, z_pointer, extended);
+    }
+  }
+  else
+  {
+    result = SL_AVR_EMU_RESULT_INVALID_FLASH_ADDRESS;
+  }
+
+  emulation->memory.pc++;
+  SL_AVR_EMU_VERBOSE_LOG(printf("%s. PC 0x%06x. z_address 0x%06x, dest 0x%02x, r_data 0x%02x\n", (extended)?"ELPM":"LPM", emulation->memory.pc, z_pointer, destination, emulation->memory.data[destination]));
+
+  return result;
+}
+
+
 
 sl_avr_emu_result_e sl_avr_emu_opcode_sex_clx(sl_avr_emu_emulation_s * emulation)
 {
@@ -671,6 +753,11 @@ sl_avr_emu_result_e sl_avr_emu_opcode_2(sl_avr_emu_emulation_s * emulation)
   else if(SL_AVR_EMU_IS_LDS_STS(emulation->memory.flash[emulation->memory.pc]))
   {
     result = sl_avr_emu_opcode_lds_sts(emulation);
+  }
+  else if(SL_AVR_EMU_IS_LPM_ELPM(emulation->memory.flash[emulation->memory.pc]) ||
+          SL_AVR_EMU_IS_LPMZ_ELPMZ(emulation->memory.flash[emulation->memory.pc]))
+  {
+    result = sl_avr_emu_opcode_lpm_elpm(emulation);
   }
   else if(SL_AVR_EMU_IS_SEX_CLX(emulation->memory.flash[emulation->memory.pc]))
   {
