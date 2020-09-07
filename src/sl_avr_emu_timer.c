@@ -140,6 +140,7 @@ sl_avr_emu_result_e sl_avr_emu_timer_8_tick(sl_avr_emu_timer_8_s *timer)
         }
         else
         {
+          /* HACK to clear overflow bit, to clenaup with actual interrupt handling */
           SL_AVR_EMU_CLEAR_BIT(*timer->tifr, SL_AVR_EMU_TIMER_0_TOV0);
         }
         if(*timer->tcnt == *timer->ocra)
