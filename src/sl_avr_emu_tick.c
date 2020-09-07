@@ -30,6 +30,7 @@
 #define SL_AVR_EMU_IS_LDS_STS(opcode)    (((opcode) & 0xFC0F) == 0x9000)
 #define SL_AVR_EMU_IS_LPM_ELPM(opcode)   (((opcode) & 0xFFEF) == 0x95C8)
 #define SL_AVR_EMU_IS_LPMZ_ELPMZ(opcode) (((opcode) & 0xFE0C) == 0x9004)
+#define SL_AVR_EMU_IS_MOV(opcode)        (((opcode) & 0xFC00) == 0x2C00)
 #define SL_AVR_EMU_IS_MOVW(opcode)       (((opcode) & 0xFF00) == 0x0100)
 #define SL_AVR_EMU_IS_OR(opcode)         (((opcode) & 0xFC00) == 0x2800)
 #define SL_AVR_EMU_IS_ORI(opcode)        (((opcode) & 0xF000) == 0x6000)
@@ -602,9 +603,9 @@ sl_avr_emu_result_e sl_avr_emu_opcode_eor(sl_avr_emu_emulation_s * emulation)
   source      = (emulation->memory.flash[emulation->memory.pc] & 0xF) | ((emulation->memory.flash[emulation->memory.pc] >> 5) & 0x10);
   destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0x1F);
 
-  SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
-
   emulation->memory.data[destination] ^= emulation->memory.data[source];
+
+  SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
 
   if(0 == emulation->memory.data[destination])
   {
@@ -632,6 +633,30 @@ sl_avr_emu_result_e sl_avr_emu_opcode_eor(sl_avr_emu_emulation_s * emulation)
   return result;
 }
 
+sl_avr_emu_result_e sl_avr_emu_opcode_mov(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+  sl_avr_emu_address_t source      = 0;
+  sl_avr_emu_address_t destination = 0;
+
+  if(SL_AVR_EMU_VERSION_AVRRC == emulation->version)
+  {
+    result = sl_avr_emu_opcode_unsupported(emulation);
+  }
+  else 
+  {
+    source      = (emulation->memory.flash[emulation->memory.pc] & 0xF) | ((emulation->memory.flash[emulation->memory.pc] >> 5) & 0x10);
+    destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0x1F);
+
+    emulation->memory.data[destination]   = emulation->memory.data[source];
+
+    emulation->memory.pc++;
+    SL_AVR_EMU_VERBOSE_LOG(printf("MOV. PC 0x%06x. source 0x%04x, dest 0x%04x, data 0x%02x\n", emulation->memory.pc, source, destination, emulation->memory.data[destination]));
+  }
+
+  return result;
+}
+
 sl_avr_emu_result_e sl_avr_emu_opcode_movw(sl_avr_emu_emulation_s * emulation)
 {
   sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
@@ -647,13 +672,11 @@ sl_avr_emu_result_e sl_avr_emu_opcode_movw(sl_avr_emu_emulation_s * emulation)
     source      = (emulation->memory.flash[emulation->memory.pc] & 0xF) << 1;
     destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0xF) << 1;
 
-    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
-
     emulation->memory.data[destination]   = emulation->memory.data[source];
     emulation->memory.data[destination+1] = emulation->memory.data[source+1];
 
     emulation->memory.pc++;
-    SL_AVR_EMU_VERBOSE_LOG(printf("MOVW. PC 0x%06x. dest 0x%04x, source 0x%04x, data 0x%02x%02x\n", emulation->memory.pc, source, destination, emulation->memory.data[destination+1], emulation->memory.data[destination]));
+    SL_AVR_EMU_VERBOSE_LOG(printf("MOVW. PC 0x%06x. source 0x%04x, dest 0x%04x, data 0x%02x%02x\n", emulation->memory.pc, source, destination, emulation->memory.data[destination+1], emulation->memory.data[destination]));
   }
 
   return result;
@@ -822,6 +845,10 @@ sl_avr_emu_result_e sl_avr_emu_opcode_0(sl_avr_emu_emulation_s * emulation)
   else if(SL_AVR_EMU_IS_EOR(emulation->memory.flash[emulation->memory.pc]))
   {
     sl_avr_emu_opcode_eor(emulation);
+  }
+  else if(SL_AVR_EMU_IS_MOV(emulation->memory.flash[emulation->memory.pc]))
+  {
+    sl_avr_emu_opcode_mov(emulation);
   }
   else if(SL_AVR_EMU_IS_MOVW(emulation->memory.flash[emulation->memory.pc]))
   {
