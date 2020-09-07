@@ -13,6 +13,7 @@
 
 #include "sl_avr_emu.h"
 #include "sl_avr_emu_bitops.h"
+#include "sl_avr_emu_interrupt.h"
 #include "sl_avr_emu_tick.h"
 #include "sl_avr_emu_timer.h"
 
@@ -38,6 +39,7 @@
 #define SL_AVR_EMU_IS_OR(opcode)         (((opcode) & 0xFC00) == 0x2800)
 #define SL_AVR_EMU_IS_ORI(opcode)        (((opcode) & 0xF000) == 0x6000)
 #define SL_AVR_EMU_IS_RET(opcode)        (((opcode) & 0xFFFF) == 0x9508)
+#define SL_AVR_EMU_IS_RETI(opcode)       (((opcode) & 0xFFFF) == 0x9518)
 #define SL_AVR_EMU_IS_RJMP_RCALL(opcode) (((opcode) & 0xE000) == 0xC000)
 #define SL_AVR_EMU_IS_SBIC_SBIS(opcode)  (((opcode) & 0xFD00) == 0x9900)
 #define SL_AVR_EMU_IS_SEX_CLX(opcode)    (((opcode) & 0xFF0F) == 0x9408)
@@ -181,6 +183,13 @@ sl_avr_emu_result_e sl_avr_emu_stack_pop_byte(sl_avr_emu_emulation_s * emulation
   return result;
 }
 
+/**
+ * @brief Pushes PC to the stack
+ * 
+ * @param emulation 
+ * @param pc 
+ * @return sl_avr_emu_result_e 
+ */
 sl_avr_emu_result_e slf_var_emu_stack_push_pc(sl_avr_emu_emulation_s * emulation, sl_avr_emu_extended_address_t pc)
 {
   sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
@@ -1455,6 +1464,41 @@ sl_avr_emu_result_e sl_avr_emu_opcode_ret(sl_avr_emu_emulation_s * emulation)
   return result;
 }
 
+sl_avr_emu_result_e sl_avr_emu_opcode_reti(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+  
+  result = slf_var_emu_stack_pop_pc(emulation, &emulation->memory.pc);
+
+  if(SL_AVR_EMU_VERSION_AVRRC == emulation->version)
+  {
+    emulation->op_cycles_remaining = 5;
+  }
+  else 
+  {
+    emulation->op_cycles_remaining = 3;
+  }
+
+  if(SL_AVR_EMU_EXTENDED_PC_ADDRESS)
+  { 
+    if(SL_AVR_EMU_VERSION_AVRRC == emulation->version)
+    {
+      result = sl_avr_emu_opcode_unsupported(emulation);
+    }
+    else
+    {
+      emulation->op_cycles_remaining++;
+    }
+  }
+
+  SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_INTERRUPT_FLAG);
+
+  SL_AVR_EMU_VERBOSE_LOG(printf("RETI. PC 0x%06x.\n", emulation->memory.pc));
+
+  return result;
+}
+
+
 sl_avr_emu_result_e sl_avr_emu_opcode_sbic_sbis(sl_avr_emu_emulation_s * emulation)
 {
   sl_avr_emu_result_e  result = SL_AVR_EMU_RESULT_SUCCESS;
@@ -1589,7 +1633,11 @@ sl_avr_emu_result_e sl_avr_emu_opcode_2(sl_avr_emu_emulation_s * emulation)
   {
     result = sl_avr_emu_opcode_ret(emulation);
   }
-  else if(SL_AVR_EMU_IS_SBIC_SBIS(emulation->memory.flash[emulation->memory.pc]))
+  else if(SL_AVR_EMU_IS_RETI(emulation->memory.flash[emulation->memory.pc]))
+  {
+    result = sl_avr_emu_opcode_reti(emulation);
+  }
+   else if(SL_AVR_EMU_IS_SBIC_SBIS(emulation->memory.flash[emulation->memory.pc]))
   {
     result = sl_avr_emu_opcode_sbic_sbis(emulation);
   }
@@ -1758,6 +1806,8 @@ sl_avr_emu_result_e sl_avr_emu_tick(sl_avr_emu_emulation_s * emulation)
   }
   else
   {
+    sl_avr_emu_interrupt_handling(emulation);
+
     if(SL_AVR_EMU_PC_ADDRESS_VALID(emulation->memory.pc))
     {
       SL_AVR_EMU_VERBOSE_LOG(printf("tick %lu: PC 0x%06x. OP 0x%04x.\n", emulation->tick_count, emulation->memory.pc, emulation->memory.flash[emulation->memory.pc]));

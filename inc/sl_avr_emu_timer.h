@@ -19,11 +19,24 @@
 #define SL_AVR_EMU_TIMER_0_TCNT0  0x26
 #define SL_AVR_EMU_TIMER_0_OCR0A  0x27
 #define SL_AVR_EMU_TIMER_0_OCR0B  0x28
-#define SL_AVR_EMU_TIMER_0_TIMSK0 0x68
+#define SL_AVR_EMU_TIMER_0_TIMSK0 0x6E
 #define SL_AVR_EMU_TIMER_0_TIFR0  0x15
+
+#define SL_AVR_EMU_TIMER_0_TOIE0  0x0
+#define SL_AVR_EMU_TIMER_0_OCIE0A 0x1
+#define SL_AVR_EMU_TIMER_0_OCIE0B 0x2
 #define SL_AVR_EMU_TIMER_0_TOV0   0x0
 #define SL_AVR_EMU_TIMER_0_OCF0A  0x1
 #define SL_AVR_EMU_TIMER_0_OCF0B  0x2
+
+/**
+ * @brief Checks if 8-bit timer is properly configured
+ * 
+ * @param timer - Timer to check
+ * @return true 
+ * @return false 
+ */
+bool sl_avr_emu_timer_8_configured(sl_avr_emu_timer_8_s *timer);
 
 /**
  * @brief Configures timer counter 0 registers

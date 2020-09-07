@@ -15,6 +15,15 @@
 #include "sl_avr_emu_types.h"
 
 /**
+ * @brief Pushes PC to the stack
+ * 
+ * @param emulation 
+ * @param pc 
+ * @return sl_avr_emu_result_e 
+ */
+sl_avr_emu_result_e slf_var_emu_stack_push_pc(sl_avr_emu_emulation_s * emulation, sl_avr_emu_extended_address_t pc);
+
+/**
  * @brief Simulates a clock tick for a given emulation
  * 
  * @param emulation            - Pointer to emulation to simulate
