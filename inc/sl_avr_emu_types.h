@@ -252,7 +252,7 @@ typedef enum
  * @brief Type for counting ticks
  * 
  */
-typedef uint32_t sl_avr_emu_tick_count_t;
+typedef uint64_t sl_avr_emu_tick_count_t;
 
 /**
  * @brief Main structure for an emulation
