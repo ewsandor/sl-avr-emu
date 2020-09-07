@@ -29,6 +29,7 @@
 #define SL_AVR_EMU_IS_LDS_STS(opcode)    (((opcode) & 0xFC0F) == 0x9000)
 #define SL_AVR_EMU_IS_LPM_ELPM(opcode)   (((opcode) & 0xFFEF) == 0x95C8)
 #define SL_AVR_EMU_IS_LPMZ_ELPMZ(opcode) (((opcode) & 0xFE0C) == 0x9004)
+#define SL_AVR_EMU_IS_MOVW(opcode)       (((opcode) & 0xFF00) == 0x0100)
 #define SL_AVR_EMU_IS_ORI(opcode)        (((opcode) & 0xF000) == 0x6000)
 #define SL_AVR_EMU_IS_RJMP_RCALL(opcode) (((opcode) & 0xE000) == 0xC000)
 #define SL_AVR_EMU_IS_SEX_CLX(opcode)    (((opcode) & 0xFF0F) == 0x9408)
@@ -501,6 +502,33 @@ sl_avr_emu_result_e sl_avr_emu_opcode_eor(sl_avr_emu_emulation_s * emulation)
   return result;
 }
 
+sl_avr_emu_result_e sl_avr_emu_opcode_movw(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+  sl_avr_emu_address_t source      = 0;
+  sl_avr_emu_address_t destination = 0;
+
+  if(SL_AVR_EMU_VERSION_AVRRC == emulation->version)
+  {
+    result = sl_avr_emu_opcode_unsupported(emulation);
+  }
+  else 
+  {
+    source      = (emulation->memory.flash[emulation->memory.pc] & 0xF) << 1;
+    destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0xF) << 1;
+
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
+
+    emulation->memory.data[destination]   = emulation->memory.data[source];
+    emulation->memory.data[destination+1] = emulation->memory.data[source+1];
+
+    emulation->memory.pc++;
+    SL_AVR_EMU_VERBOSE_LOG(printf("MOVW. PC 0x%06x. dest 0x%04x, source 0x%04x, data 0x%02x%02x\n", emulation->memory.pc, source, destination, emulation->memory.data[destination+1], emulation->memory.data[destination]));
+  }
+
+  return result;
+}
+
 /**
  * @brief Opcodes with 0b00 prefix handling
  * 
@@ -536,7 +564,11 @@ sl_avr_emu_result_e sl_avr_emu_opcode_0(sl_avr_emu_emulation_s * emulation)
   {
     sl_avr_emu_opcode_eor(emulation);
   }
-  else
+  else if(SL_AVR_EMU_IS_MOVW(emulation->memory.flash[emulation->memory.pc]))
+  {
+    sl_avr_emu_opcode_movw(emulation);
+  }
+else
   {
     /* Unrecognized OPCODE Handling */
     result = sl_avr_emu_opcode_unrecognized(emulation);
