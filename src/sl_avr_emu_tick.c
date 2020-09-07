@@ -21,6 +21,7 @@
 #define SL_AVR_EMU_IS_CP_CPC(opcode)     (((opcode) & 0xEC00) == 0x0400)
 #define SL_AVR_EMU_IS_CPI(opcode)        (((opcode) & 0xF000) == 0x3000)
 #define SL_AVR_EMU_IS_CPSE(opcode)       (((opcode) & 0xFC00) == 0x1000)
+#define SL_AVR_EMU_IS_DEC(opcode)        (((opcode) & 0xFE0F) == 0x940A)
 #define SL_AVR_EMU_IS_EOR(opcode)        (((opcode) & 0xFC00) == 0x2400)
 #define SL_AVR_EMU_IS_IN_OUT(opcode)     (((opcode) & 0xF000) == 0xB000)
 #define SL_AVR_EMU_IS_JMP_CALL(opcode)   (((opcode) & 0xFE0C) == 0x940C)
@@ -723,7 +724,7 @@ sl_avr_emu_result_e sl_avr_emu_opcode_subi_sbci(sl_avr_emu_emulation_s * emulati
     SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
   }
 
-  if( SL_AVR_EMU_CHECK_BIT(d_data, 7) )
+  if( SL_AVR_EMU_CHECK_BIT(difference, 7) )
   {
     SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
   }
@@ -927,6 +928,62 @@ sl_avr_emu_result_e sl_avr_emu_opcode_1(sl_avr_emu_emulation_s * emulation)
     /* Unrecognized OPCODE Handling */
     result = sl_avr_emu_opcode_unrecognized(emulation);
   }
+  return result;
+}
+
+sl_avr_emu_result_e sl_avr_emu_opcode_dec(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_result_e  result = SL_AVR_EMU_RESULT_SUCCESS;
+  sl_avr_emu_byte_t    difference, d_data;
+  sl_avr_emu_address_t destination = 0;
+
+  destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0x1F);
+
+  d_data = emulation->memory.data[destination];
+
+  difference = d_data - 1;
+
+  emulation->memory.data[destination] = difference;
+
+  if(0x7F == difference)
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
+  }
+
+  if( SL_AVR_EMU_CHECK_BIT(difference, 7) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
+  }
+
+  if(0 == difference)
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
+  }
+
+  if(SL_AVR_EMU_CHECK_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG) ^ SL_AVR_EMU_CHECK_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG))
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_SIGN_FLAG);
+  }
+  else
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_SIGN_FLAG);
+  }
+
+  emulation->memory.pc++;
+  SL_AVR_EMU_VERBOSE_LOG(printf("DEC. PC 0x%06x. dest 0x%04x, d_data 0x%02x, difference 0x%02x, sreg 0x%02x\n", emulation->memory.pc, destination, d_data, difference, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS]));
+
   return result;
 }
 
@@ -1328,7 +1385,11 @@ sl_avr_emu_result_e sl_avr_emu_opcode_2(sl_avr_emu_emulation_s * emulation)
 {
   sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
 
-  if( SL_AVR_EMU_IS_IN_OUT(emulation->memory.flash[emulation->memory.pc]) )
+  if( SL_AVR_EMU_IS_DEC(emulation->memory.flash[emulation->memory.pc]))
+  {
+    result = sl_avr_emu_opcode_dec(emulation);
+  }
+  else if( SL_AVR_EMU_IS_IN_OUT(emulation->memory.flash[emulation->memory.pc]) )
   {
     result = sl_avr_emu_opcode_in_out(emulation);
   }
