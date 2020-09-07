@@ -35,6 +35,7 @@
 #define SL_AVR_EMU_IS_ORI(opcode)        (((opcode) & 0xF000) == 0x6000)
 #define SL_AVR_EMU_IS_RET(opcode)        (((opcode) & 0xFFFF) == 0x9508)
 #define SL_AVR_EMU_IS_RJMP_RCALL(opcode) (((opcode) & 0xE000) == 0xC000)
+#define SL_AVR_EMU_IS_SBIC_SBIS(opcode)  (((opcode) & 0xFD00) == 0x9900)
 #define SL_AVR_EMU_IS_SEX_CLX(opcode)    (((opcode) & 0xFF0F) == 0x9408)
 #define SL_AVR_EMU_IS_SUBI_SBCI(opcode)  (((opcode) & 0xE000) == 0x4000)
 
@@ -1203,6 +1204,67 @@ sl_avr_emu_result_e sl_avr_emu_opcode_ret(sl_avr_emu_emulation_s * emulation)
   return result;
 }
 
+sl_avr_emu_result_e sl_avr_emu_opcode_sbic_sbis(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_result_e  result = SL_AVR_EMU_RESULT_SUCCESS;
+  sl_avr_emu_address_t io_address = 0;
+  sl_avr_emu_address_t io_bit     = 0;
+  bool skip, if_set;
+
+  io_bit     = (emulation->memory.flash[emulation->memory.pc] & 0x7);
+  io_address = ((emulation->memory.flash[emulation->memory.pc] >> 3) & 0x1F);
+  if_set = SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 9);
+
+  skip = SL_AVR_EMU_CHECK_BIT(emulation->memory.data[SL_AVR_EMU_IO_TO_DATA_ADDRESS(io_address)], io_bit);
+
+  if(!if_set)
+  {
+    skip = !skip;
+  }
+
+  if(skip)
+  {
+    if(SL_AVR_EMU_PC_ADDRESS_VALID(emulation->memory.pc+1))
+    {
+      if(SL_AVR_EMU_IS_TWO_WORD_OPCODE(emulation->memory.flash[emulation->memory.pc+1]))
+      {
+        if(SL_AVR_EMU_VERSION_AVRRC == emulation->version)
+        {
+          result = sl_avr_emu_opcode_unsupported(emulation);
+        }
+        else
+        {
+          emulation->memory.pc += 3;
+          emulation->op_cycles_remaining = 2;
+        }
+      }
+      else 
+      {
+        emulation->memory.pc += 2;
+        emulation->op_cycles_remaining = 1;
+      }
+    }
+    else 
+    {
+      result = SL_AVR_EMU_RESULT_INVALID_PC;
+    }
+  }
+  else 
+  {
+    emulation->memory.pc++;
+  }
+
+  if(SL_AVR_EMU_VERSION_AVRXM == emulation->version)
+  {
+    emulation->op_cycles_remaining++;
+  }
+
+  SL_AVR_EMU_VERBOSE_LOG(printf("%s. PC 0x%06x. io_address 0x%04x io_data 0x%02x io_bit 0x%x\n", (if_set)?"SBIS":"SBIC", emulation->memory.pc, io_address, emulation->memory.data[SL_AVR_EMU_IO_TO_DATA_ADDRESS(io_address)], io_bit));
+
+  return result;
+}
+
+
 sl_avr_emu_result_e sl_avr_emu_opcode_sex_clx(sl_avr_emu_emulation_s * emulation)
 {
   sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
@@ -1267,6 +1329,10 @@ sl_avr_emu_result_e sl_avr_emu_opcode_2(sl_avr_emu_emulation_s * emulation)
   else if(SL_AVR_EMU_IS_RET(emulation->memory.flash[emulation->memory.pc]))
   {
     result = sl_avr_emu_opcode_ret(emulation);
+  }
+  else if(SL_AVR_EMU_IS_SBIC_SBIS(emulation->memory.flash[emulation->memory.pc]))
+  {
+    result = sl_avr_emu_opcode_sbic_sbis(emulation);
   }
   else if(SL_AVR_EMU_IS_SEX_CLX(emulation->memory.flash[emulation->memory.pc]))
   {
