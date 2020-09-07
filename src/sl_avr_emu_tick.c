@@ -39,6 +39,7 @@
 #define SL_AVR_EMU_IS_RJMP_RCALL(opcode) (((opcode) & 0xE000) == 0xC000)
 #define SL_AVR_EMU_IS_SBIC_SBIS(opcode)  (((opcode) & 0xFD00) == 0x9900)
 #define SL_AVR_EMU_IS_SEX_CLX(opcode)    (((opcode) & 0xFF0F) == 0x9408)
+#define SL_AVR_EMU_IS_SUB(opcode)        (((opcode) & 0xEC00) == 0x0800)
 #define SL_AVR_EMU_IS_SUBI_SBCI(opcode)  (((opcode) & 0xE000) == 0x4000)
 
 #define SL_AVR_EMU_IS_TWO_WORD_OPCODE(opcode) (SL_AVR_EMU_IS_JMP_CALL(opcode) || SL_AVR_EMU_IS_LDS_STS(opcode))
@@ -703,6 +704,8 @@ sl_avr_emu_result_e sl_avr_emu_opcode_subi_sbci(sl_avr_emu_emulation_s * emulati
     difference--;
   }
 
+  emulation->memory.data[destination] = difference;
+
   if( (!SL_AVR_EMU_CHECK_BIT(d_data, 3)  && SL_AVR_EMU_CHECK_BIT(k_data, 3))  ||
        (SL_AVR_EMU_CHECK_BIT(difference, 3) && SL_AVR_EMU_CHECK_BIT(k_data, 3)) ||
       (!SL_AVR_EMU_CHECK_BIT(d_data, 3)  && SL_AVR_EMU_CHECK_BIT(difference, 3)) )
@@ -807,6 +810,94 @@ sl_avr_emu_result_e sl_avr_emu_opcode_or(sl_avr_emu_emulation_s * emulation)
   return result;
 }
 
+sl_avr_emu_result_e sl_avr_emu_opcode_sub(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_result_e  result = SL_AVR_EMU_RESULT_SUCCESS;
+  bool                 with_carry  = 0;
+  sl_avr_emu_address_t source      = 0;
+  sl_avr_emu_address_t destination = 0;
+  sl_avr_emu_byte_t    d_data, r_data, difference;
+
+  source      = (emulation->memory.flash[emulation->memory.pc] & 0xF) | ((emulation->memory.flash[emulation->memory.pc] >> 5) & 0x10);
+  destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0x1F);
+  with_carry  = SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 12);
+
+  r_data = emulation->memory.data[source];
+  d_data = emulation->memory.data[destination];
+
+  difference = d_data - r_data;
+
+  if(with_carry && SL_AVR_EMU_CHECK_SREG_BIT(*emulation, SL_AVR_EMU_SREG_CARRY_FLAG))
+  {
+    difference--;
+  }
+
+  emulation->memory.data[destination] = difference;
+
+  if( (!SL_AVR_EMU_CHECK_BIT(d_data, 3)  && SL_AVR_EMU_CHECK_BIT(r_data, 3))  ||
+       (SL_AVR_EMU_CHECK_BIT(difference, 3) && SL_AVR_EMU_CHECK_BIT(r_data, 3)) ||
+      (!SL_AVR_EMU_CHECK_BIT(d_data, 3)  && SL_AVR_EMU_CHECK_BIT(difference, 3)) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_HALF_CARRY_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_HALF_CARRY_FLAG);
+  }
+
+  if(  (SL_AVR_EMU_CHECK_BIT(d_data, 7) && !SL_AVR_EMU_CHECK_BIT(r_data, 7) && !SL_AVR_EMU_CHECK_BIT(difference, 7)) ||
+      (!SL_AVR_EMU_CHECK_BIT(d_data, 7) &&  SL_AVR_EMU_CHECK_BIT(r_data, 7) &&  SL_AVR_EMU_CHECK_BIT(difference, 7)) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
+  }
+
+  if( SL_AVR_EMU_CHECK_BIT(difference, 7) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
+  }
+
+  if(0 == difference && (!with_carry || (with_carry && SL_AVR_EMU_CHECK_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG))) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
+  }
+
+  if( (!SL_AVR_EMU_CHECK_BIT(d_data, 7)  && SL_AVR_EMU_CHECK_BIT(r_data, 7)) ||
+       (SL_AVR_EMU_CHECK_BIT(difference, 7) && SL_AVR_EMU_CHECK_BIT(r_data, 7)) ||
+      (!SL_AVR_EMU_CHECK_BIT(d_data, 7)  && SL_AVR_EMU_CHECK_BIT(difference, 7)) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_CARRY_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_CARRY_FLAG);
+  }
+
+  if(SL_AVR_EMU_CHECK_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG) ^ SL_AVR_EMU_CHECK_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG))
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_SIGN_FLAG);
+  }
+  else
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_SIGN_FLAG);
+  }
+
+  emulation->memory.pc++;
+  SL_AVR_EMU_VERBOSE_LOG(printf("%s. PC 0x%06x. dest 0x%04x, d_data 0x%02x, r_data 0x%02x, difference 0x%02x, sreg 0x%02x\n", (with_carry)?"SBC":"SUB", emulation->memory.pc, destination, d_data, r_data, difference, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS]));
+
+  return result;
+}
 
 /**
  * @brief Opcodes with 0b00 prefix handling
@@ -858,6 +949,10 @@ sl_avr_emu_result_e sl_avr_emu_opcode_0(sl_avr_emu_emulation_s * emulation)
   else if(SL_AVR_EMU_IS_OR(emulation->memory.flash[emulation->memory.pc]))
   {
     sl_avr_emu_opcode_or(emulation);
+  }
+  else if(SL_AVR_EMU_IS_SUB(emulation->memory.flash[emulation->memory.pc]))
+  {
+    sl_avr_emu_opcode_sub(emulation);
   }
   else
   {
