@@ -249,6 +249,12 @@ typedef enum
 } sl_avr_emu_version_e;
 
 /**
+ * @brief Type for counting ticks
+ * 
+ */
+typedef uint32_t sl_avr_emu_tick_count_t;
+
+/**
  * @brief Main structure for an emulation
  * 
  */
@@ -263,6 +269,9 @@ typedef struct
   /* Cycles remaining for current operation.  
      Process as new op on tick if 0, else decrements 1 on tick */
   sl_avr_emu_op_count_t op_cycles_remaining;
+
+  /* Number of ticks emulated */
+  sl_avr_emu_tick_count_t tick_count;
 
 } sl_avr_emu_emulation_s;
 

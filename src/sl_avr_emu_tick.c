@@ -1430,17 +1430,19 @@ sl_avr_emu_result_e sl_avr_emu_opcode_3(sl_avr_emu_emulation_s * emulation)
 sl_avr_emu_result_e sl_avr_emu_tick(sl_avr_emu_emulation_s * emulation)
 {
   sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+  
+  emulation->tick_count++;
 
   if(emulation->op_cycles_remaining > 0)
   {
     emulation->op_cycles_remaining--;
-    SL_AVR_EMU_VERBOSE_LOG(printf("%u cycles for remaining for current operation\n", emulation->op_cycles_remaining));
+    SL_AVR_EMU_VERBOSE_LOG(printf("tick %u: %u cycles for remaining for current operation\n", emulation->tick_count, emulation->op_cycles_remaining));
   }
   else
   {
     if(SL_AVR_EMU_PC_ADDRESS_VALID(emulation->memory.pc))
     {
-      SL_AVR_EMU_VERBOSE_LOG(printf("PC 0x%06x. OP 0x%04x.\n", emulation->memory.pc, emulation->memory.flash[emulation->memory.pc]));
+      SL_AVR_EMU_VERBOSE_LOG(printf("tick %u: PC 0x%06x. OP 0x%04x.\n", emulation->tick_count, emulation->memory.pc, emulation->memory.flash[emulation->memory.pc]));
       switch (emulation->memory.flash[emulation->memory.pc] >> (16-2)) {
         case 0b00:
         {
