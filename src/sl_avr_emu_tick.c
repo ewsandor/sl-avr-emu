@@ -30,6 +30,7 @@
 #define SL_AVR_EMU_IS_LPM_ELPM(opcode)   (((opcode) & 0xFFEF) == 0x95C8)
 #define SL_AVR_EMU_IS_LPMZ_ELPMZ(opcode) (((opcode) & 0xFE0C) == 0x9004)
 #define SL_AVR_EMU_IS_MOVW(opcode)       (((opcode) & 0xFF00) == 0x0100)
+#define SL_AVR_EMU_IS_OR(opcode)         (((opcode) & 0xFC00) == 0x2800)
 #define SL_AVR_EMU_IS_ORI(opcode)        (((opcode) & 0xF000) == 0x6000)
 #define SL_AVR_EMU_IS_RJMP_RCALL(opcode) (((opcode) & 0xE000) == 0xC000)
 #define SL_AVR_EMU_IS_SEX_CLX(opcode)    (((opcode) & 0xFF0F) == 0x9408)
@@ -615,6 +616,45 @@ sl_avr_emu_result_e sl_avr_emu_opcode_subi_sbci(sl_avr_emu_emulation_s * emulati
   return result;
 }
 
+sl_avr_emu_result_e sl_avr_emu_opcode_or(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+  sl_avr_emu_address_t source      = 0;
+  sl_avr_emu_address_t destination = 0;
+
+  source      = (emulation->memory.flash[emulation->memory.pc] & 0xF) | ((emulation->memory.flash[emulation->memory.pc] >> 5) & 0x10);
+  destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0x1F);
+
+  emulation->memory.data[destination] |= emulation->memory.data[source];
+
+  SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
+
+  if(0 == emulation->memory.data[destination])
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
+  }
+
+  if( 0 != (emulation->memory.data[destination] & 0x80) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_SIGN_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_SIGN_FLAG);
+  }
+
+  emulation->memory.pc++;
+  SL_AVR_EMU_VERBOSE_LOG(printf("OR. PC 0x%06x. dest 0x%04x, data 0x%04x\n", emulation->memory.pc, destination, emulation->memory.data[destination]));
+
+  return result;
+}
+
 
 /**
  * @brief Opcodes with 0b00 prefix handling
@@ -654,6 +694,10 @@ sl_avr_emu_result_e sl_avr_emu_opcode_0(sl_avr_emu_emulation_s * emulation)
   else if(SL_AVR_EMU_IS_MOVW(emulation->memory.flash[emulation->memory.pc]))
   {
     sl_avr_emu_opcode_movw(emulation);
+  }
+  else if(SL_AVR_EMU_IS_OR(emulation->memory.flash[emulation->memory.pc]))
+  {
+    sl_avr_emu_opcode_or(emulation);
   }
   else
   {
