@@ -15,6 +15,7 @@
 #include "sl_avr_emu_bitops.h"
 #include "sl_avr_emu_tick.h"
 
+#define SL_AVR_EMU_IS_ADD(opcode)        (((opcode) & 0xEC00) == 0x0C00)
 #define SL_AVR_EMU_IS_AND(opcode)        (((opcode) & 0xFC00) == 0x2000)
 #define SL_AVR_EMU_IS_BRBS_BRBC(opcode)  (((opcode) & 0xF800) == 0xF000)
 #define SL_AVR_EMU_IS_CP_CPC(opcode)     (((opcode) & 0xEC00) == 0x0400)
@@ -160,6 +161,93 @@ sl_avr_emu_result_e sl_avr_emu_opcode_unsupported(sl_avr_emu_emulation_s * emula
   }
 
   return SL_AVR_EMU_RESULT_UNSUPPORTED_OPCODE;
+}
+
+sl_avr_emu_result_e sl_avr_emu_opcode_add(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+  bool                 with_carry  = 0;
+  sl_avr_emu_address_t source      = 0;
+  sl_avr_emu_address_t destination = 0;
+  sl_avr_emu_byte_t    d_data, r_data, sum;
+
+  source      = (emulation->memory.flash[emulation->memory.pc] & 0xF) | ((emulation->memory.flash[emulation->memory.pc] >> 5) & 0x10);
+  destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0x1F);
+  with_carry  = SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 12);
+
+  r_data = emulation->memory.data[source];
+  d_data = emulation->memory.data[destination];
+  sum = r_data+d_data;
+  if(with_carry && SL_AVR_EMU_CHECK_SREG_BIT(*emulation, SL_AVR_EMU_SREG_CARRY_FLAG))
+  {
+    sum++;
+  }
+
+  emulation->memory.data[destination] = sum;
+
+  if(  (SL_AVR_EMU_CHECK_BIT(d_data, 3)  && SL_AVR_EMU_CHECK_BIT(r_data, 3))  ||
+      (!SL_AVR_EMU_CHECK_BIT(sum, 3)     && SL_AVR_EMU_CHECK_BIT(r_data, 3)) ||
+      (!SL_AVR_EMU_CHECK_BIT(sum, 3)     && SL_AVR_EMU_CHECK_BIT(d_data, 3)) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_HALF_CARRY_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_HALF_CARRY_FLAG);
+  }
+
+  if(  (SL_AVR_EMU_CHECK_BIT(d_data, 7) &&   SL_AVR_EMU_CHECK_BIT(r_data, 7) && !SL_AVR_EMU_CHECK_BIT(sum, 7)) ||
+      (!SL_AVR_EMU_CHECK_BIT(d_data, 7) &&  !SL_AVR_EMU_CHECK_BIT(r_data, 7) &&  SL_AVR_EMU_CHECK_BIT(sum, 7)) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
+  }
+
+  if( SL_AVR_EMU_CHECK_BIT(d_data, 7) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
+  }
+
+  if(0 == sum)
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
+  }
+
+  if(  (SL_AVR_EMU_CHECK_BIT(d_data, 7) && SL_AVR_EMU_CHECK_BIT(r_data, 7)) ||
+      (!SL_AVR_EMU_CHECK_BIT(sum, 7)    && SL_AVR_EMU_CHECK_BIT(r_data, 7)) ||
+      (!SL_AVR_EMU_CHECK_BIT(sum, 7))   && SL_AVR_EMU_CHECK_BIT(d_data, 7))
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_CARRY_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_CARRY_FLAG);
+  }
+
+  if(SL_AVR_EMU_CHECK_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG) ^ SL_AVR_EMU_CHECK_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG))
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_SIGN_FLAG);
+  }
+  else
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_SIGN_FLAG);
+  }
+
+  emulation->memory.pc++;
+  SL_AVR_EMU_VERBOSE_LOG(printf("%s. PC 0x%06x. dest 0x%04x, r_data 0x%02x, d_data 0x%02x, sum 0x%02x, sreg 0x%02x\n", (with_carry)?"ADC":"ADD", emulation->memory.pc, destination, r_data, d_data, sum, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS]));
+
+  return result;
 }
 
 sl_avr_emu_result_e sl_avr_emu_opcode_and(sl_avr_emu_emulation_s * emulation)
@@ -427,6 +515,10 @@ sl_avr_emu_result_e sl_avr_emu_opcode_0(sl_avr_emu_emulation_s * emulation)
     /* NOP Handling */
     emulation->memory.pc++;
     SL_AVR_EMU_VERBOSE_LOG(printf("NOP. PC 0x%06x\n", emulation->memory.pc));
+  }
+  else if(SL_AVR_EMU_IS_ADD(emulation->memory.flash[emulation->memory.pc]))
+  {
+    sl_avr_emu_opcode_add(emulation);
   }
   else if(SL_AVR_EMU_IS_AND(emulation->memory.flash[emulation->memory.pc]))
   {
