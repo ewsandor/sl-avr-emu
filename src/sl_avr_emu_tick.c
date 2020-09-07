@@ -1098,12 +1098,12 @@ sl_avr_emu_result_e sl_avr_emu_opcode_in_out(sl_avr_emu_emulation_s * emulation)
   {
     emulation->memory.pc++;
     emulation->memory.data[SL_AVR_EMU_IO_TO_DATA_ADDRESS(io_address)] = emulation->memory.data[destination];
-    SL_AVR_EMU_VERBOSE_LOG(printf("OUT. PC 0x%06x.   io 0x%04x, data 0x%04x\n", emulation->memory.pc, io_address, emulation->memory.data[SL_AVR_EMU_IO_TO_DATA_ADDRESS(io_address)]));
+    SL_AVR_EMU_VERBOSE_LOG(printf("OUT. PC 0x%06x. io 0x%04x, dest 0x%04x data 0x%04x\n", emulation->memory.pc, io_address, destination, emulation->memory.data[SL_AVR_EMU_IO_TO_DATA_ADDRESS(io_address)]));
   }
   else {
     emulation->memory.pc++;
     emulation->memory.data[destination] = emulation->memory.data[SL_AVR_EMU_IO_TO_DATA_ADDRESS(io_address)];
-    SL_AVR_EMU_VERBOSE_LOG(printf("IN. PC 0x%06x. dest 0x%04x, data 0x%04x\n", emulation->memory.pc, destination, emulation->memory.data[destination]));
+    SL_AVR_EMU_VERBOSE_LOG(printf("IN. PC 0x%06x. io 0x%04x, dest 0x%04x, data 0x%04x\n", emulation->memory.pc, io_address, destination, emulation->memory.data[destination]));
   }
 
   return result;
