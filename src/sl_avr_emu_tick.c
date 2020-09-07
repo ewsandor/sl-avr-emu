@@ -1134,6 +1134,43 @@ sl_avr_emu_result_e sl_avr_emu_opcode_lpm_elpm(sl_avr_emu_emulation_s * emulatio
   return result;
 }
 
+sl_avr_emu_result_e sl_avr_emu_opcode_push_pop(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+  sl_avr_emu_extended_address_t destination;
+  bool                push;
+
+  push = SL_AVR_EMU_CHECK_BIT(emulation->memory.flash[emulation->memory.pc], 9);
+  destination = (emulation->memory.flash[emulation->memory.pc]>>4) & 0x1F;
+  
+  if(push)
+  {
+    result = sl_avr_emu_stack_push_byte(emulation, emulation->memory.data[destination]);
+    if(SL_AVR_EMU_VERSION_AVRE == emulation->version)
+    {
+      emulation->op_cycles_remaining = 1;
+    }
+  }
+  else 
+  {
+    result = sl_avr_emu_stack_pop_byte(emulation, &emulation->memory.data[destination]);
+
+    if(SL_AVR_EMU_VERSION_AVRRC == emulation->version)
+    {
+      emulation->op_cycles_remaining = 2;
+    }
+    else 
+    {
+      emulation->op_cycles_remaining = 1;
+    }
+  }
+
+  emulation->memory.pc++;
+  SL_AVR_EMU_VERBOSE_LOG(printf("%s. PC 0x%06x. d_data 0x%02x\n", (push)?"PUSH":"POP", emulation->memory.pc, emulation->memory.data[destination]));
+
+  return result;
+}
+
 sl_avr_emu_result_e sl_avr_emu_opcode_ret(sl_avr_emu_emulation_s * emulation)
 {
   sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
@@ -1222,6 +1259,10 @@ sl_avr_emu_result_e sl_avr_emu_opcode_2(sl_avr_emu_emulation_s * emulation)
           SL_AVR_EMU_IS_LPMZ_ELPMZ(emulation->memory.flash[emulation->memory.pc]))
   {
     result = sl_avr_emu_opcode_lpm_elpm(emulation);
+  }
+  else if(SL_AVR_EMU_IS_PUSH_POP(emulation->memory.flash[emulation->memory.pc]))
+  {
+    result = sl_avr_emu_opcode_push_pop(emulation);
   }
   else if(SL_AVR_EMU_IS_RET(emulation->memory.flash[emulation->memory.pc]))
   {
