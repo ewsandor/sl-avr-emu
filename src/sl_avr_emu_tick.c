@@ -43,6 +43,7 @@
 #define SL_AVR_EMU_IS_RETI(opcode)       (((opcode) & 0xFFFF) == 0x9518)
 #define SL_AVR_EMU_IS_RJMP_RCALL(opcode) (((opcode) & 0xE000) == 0xC000)
 #define SL_AVR_EMU_IS_SBIC_SBIS(opcode)  (((opcode) & 0xFD00) == 0x9900)
+#define SL_AVR_EMU_IS_SBIW(opcode)       (((opcode) & 0xFF00) == 0x9700)
 #define SL_AVR_EMU_IS_SEX_CLX(opcode)    (((opcode) & 0xFF0F) == 0x9408)
 #define SL_AVR_EMU_IS_SUB(opcode)        (((opcode) & 0xEC00) == 0x0800)
 #define SL_AVR_EMU_IS_SUBI_SBCI(opcode)  (((opcode) & 0xE000) == 0x4000)
@@ -1593,6 +1594,75 @@ sl_avr_emu_result_e sl_avr_emu_opcode_sbic_sbis(sl_avr_emu_emulation_s * emulati
   return result;
 }
 
+sl_avr_emu_result_e sl_avr_emu_opcode_sbiw(sl_avr_emu_emulation_s * emulation)
+{
+  sl_avr_emu_result_e result = SL_AVR_EMU_RESULT_SUCCESS;
+  sl_avr_emu_address_t destination = 0;
+  sl_avr_emu_word_t    d_data, k_data, difference;
+
+  k_data      = (emulation->memory.flash[emulation->memory.pc] & 0xF) | ((emulation->memory.flash[emulation->memory.pc] >> 2) & 0x30);
+  destination = ((emulation->memory.flash[emulation->memory.pc] >> 4) & 0x3);
+
+  destination = (destination<<2) + 24;
+
+  d_data = emulation->memory.data[destination] | emulation->memory.data[destination+1]<<8;
+
+  difference = d_data - k_data;
+
+  emulation->memory.data[destination]   = difference & 0xFF;
+  emulation->memory.data[destination+1] = (difference >> 8) & 0xFF;
+
+  if(SL_AVR_EMU_CHECK_BIT(d_data, 15) && !SL_AVR_EMU_CHECK_BIT(difference, 15)) 
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG);
+  }
+
+  if( SL_AVR_EMU_CHECK_BIT(difference, 15) )
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG);
+  }
+
+  if(0 == difference)
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_ZERO_FLAG);
+  }
+
+  if(SL_AVR_EMU_CHECK_BIT(difference, 15) && !SL_AVR_EMU_CHECK_BIT(d_data, 15))
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_CARRY_FLAG);
+  }
+  else 
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_CARRY_FLAG);
+  }
+
+  if(SL_AVR_EMU_CHECK_SREG_BIT(*emulation, SL_AVR_EMU_SREG_NEGATIVE_FLAG) ^ SL_AVR_EMU_CHECK_SREG_BIT(*emulation, SL_AVR_EMU_SREG_OVERFLOW_FLAG))
+  {
+    SL_AVR_EMU_SET_SREG_BIT(*emulation, SL_AVR_EMU_SREG_SIGN_FLAG);
+  }
+  else
+  {
+    SL_AVR_EMU_CLEAR_SREG_BIT(*emulation, SL_AVR_EMU_SREG_SIGN_FLAG);
+  }
+
+  emulation->op_cycles_remaining=1;
+  emulation->memory.pc++;
+  SL_AVR_EMU_VERBOSE_LOG(printf("ADIW. PC 0x%06x. dest 0x%04x, k_data 0x%02x, d_data 0x%04x, difference 0x%04x, sreg 0x%02x\n", emulation->memory.pc, destination, k_data, d_data, difference, emulation->memory.data[SL_AVR_EMU_SREG_ADDRESS]));
+
+  return result;
+}
 
 sl_avr_emu_result_e sl_avr_emu_opcode_sex_clx(sl_avr_emu_emulation_s * emulation)
 {
@@ -1675,9 +1745,13 @@ sl_avr_emu_result_e sl_avr_emu_opcode_2(sl_avr_emu_emulation_s * emulation)
   {
     result = sl_avr_emu_opcode_reti(emulation);
   }
-   else if(SL_AVR_EMU_IS_SBIC_SBIS(emulation->memory.flash[emulation->memory.pc]))
+  else if(SL_AVR_EMU_IS_SBIC_SBIS(emulation->memory.flash[emulation->memory.pc]))
   {
     result = sl_avr_emu_opcode_sbic_sbis(emulation);
+  }
+  else if(SL_AVR_EMU_IS_SBIW(emulation->memory.flash[emulation->memory.pc]))
+  {
+    result = sl_avr_emu_opcode_sbiw(emulation);
   }
   else if(SL_AVR_EMU_IS_SEX_CLX(emulation->memory.flash[emulation->memory.pc]))
   {
