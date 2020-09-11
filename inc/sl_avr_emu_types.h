@@ -335,8 +335,10 @@ typedef struct
      Process as new op on tick if 0, else decrements 1 on tick */
   sl_avr_emu_op_count_t op_cycles_remaining;
 
+  /* Number of clock ticks */
+  sl_avr_emu_tick_count_t clock_tick_count;
   /* Number of ticks emulated */
-  sl_avr_emu_tick_count_t tick_count;
+  sl_avr_emu_tick_count_t cpu_tick_count;
   /* Number of IO ticks emulated */
   sl_avr_emu_tick_count_t io_tick_count;
 

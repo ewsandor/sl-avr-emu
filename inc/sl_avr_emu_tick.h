@@ -29,7 +29,7 @@ sl_avr_emu_result_e slf_var_emu_stack_push_pc(sl_avr_emu_emulation_s * emulation
  * @param emulation            - Pointer to emulation to simulate
  * @return sl_avr_emu_result_e
  */
-sl_avr_emu_result_e sl_avr_emu_tick(sl_avr_emu_emulation_s * emulation);
+sl_avr_emu_result_e sl_avr_emu_cpu_tick(sl_avr_emu_emulation_s * emulation);
 
 /**
  * @brief Simulates a IO clock tick for a given emulation

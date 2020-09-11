@@ -21,4 +21,6 @@ extern bool sl_avr_emu_verbose_logging_enabled;
 
 #define SL_AVR_EMU_VERBOSE_LOG(log_command) { if(sl_avr_emu_verbose_logging_enabled) {log_command;} }
 
+#define SL_AVR_EMU_CLOCKS_PER_SEC 16000000
+
 #endif  //_SL_AVR_EMU_HPP_
