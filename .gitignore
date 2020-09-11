@@ -6,3 +6,4 @@ sl_avr_emu
 *.hex
 *.code-workspace
 *.swp
+.vscode
